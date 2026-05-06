@@ -67,7 +67,7 @@ Update these checkboxes as work is done.
 |---|---|---|
 | Language | Java 21 | 1 |
 | Framework | Spring Boot 3.x | 1 |
-| Build | Maven | 1 |
+| Build | Gradle (Kotlin DSL) | 1 |
 | Database | PostgreSQL | 1 |
 | AI calls | Direct OpenAI HTTP (RestTemplate) | 1 |
 | HTML parsing | Jsoup | 2 |
@@ -108,8 +108,8 @@ src/main/java/com/yourname/llmmemory/
 ## Dev Commands
 
 ```bash
-./mvnw spring-boot:run
-./mvnw test
+./gradlew bootRun
+./gradlew test
 
 # PostgreSQL (Phase 1)
 docker run -d --name postgres \

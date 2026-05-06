@@ -157,43 +157,24 @@ src/main/java/com/yourname/llmmemory/
 
 ---
 
-## Dependencies (pom.xml)
+## Dependencies (build.gradle.kts)
 
-```xml
-<dependencies>
-    <!-- Spring Boot -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-data-jpa</artifactId>
-    </dependency>
+```kotlin
+dependencies {
+    // Spring Boot
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
-    <!-- PostgreSQL -->
-    <dependency>
-        <groupId>org.postgresql</groupId>
-        <artifactId>postgresql</artifactId>
-        <scope>runtime</scope>
-    </dependency>
+    // PostgreSQL
+    runtimeOnly("org.postgresql:postgresql")
 
-    <!-- HTTP client for OpenAI calls -->
-    <!-- Spring WebFlux for WebClient, or just use RestTemplate from spring-web -->
+    // Validation
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 
-    <!-- Validation -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-validation</artifactId>
-    </dependency>
-
-    <!-- Lombok (optional but saves boilerplate) -->
-    <dependency>
-        <groupId>org.projectlombok</groupId>
-        <artifactId>lombok</artifactId>
-        <optional>true</optional>
-    </dependency>
-</dependencies>
+    // Lombok (optional but saves boilerplate)
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
+}
 ```
 
 ---

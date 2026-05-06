@@ -133,7 +133,7 @@ Database (Phase 2+): Redis Stack (with Vector Search)
 Models:          OpenAI gpt-4o-mini (summarization)
                  OpenAI text-embedding-3-small (embeddings)
                  → Swappable to Ollama in Phase 2
-Build Tool:      Maven or Gradle (your choice)
+Build Tool:      Gradle (Kotlin DSL)
 Containerization: Docker, Docker Compose
 Orchestration:   Kubernetes (Phase 4)
 ```

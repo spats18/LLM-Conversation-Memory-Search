@@ -34,12 +34,8 @@ Your app will:
 
 **Technology to use:** `Jsoup` — a Java HTML parser. Simple, battle-tested.
 
-```xml
-<dependency>
-    <groupId>org.jsoup</groupId>
-    <artifactId>jsoup</artifactId>
-    <version>1.17.2</version>
-</dependency>
+```kotlin
+implementation("org.jsoup:jsoup:1.17.2")
 ```
 
 **Important caveat:** Claude's HTML structure can change. Your parser will be fragile — that is expected and honest. You should document this in your code. The interviewer will respect that you understood the tradeoff.
@@ -103,22 +99,10 @@ LangChain4j is the Java port of LangChain. It provides:
 
 ### Dependency
 
-```xml
-<dependency>
-    <groupId>dev.langchain4j</groupId>
-    <artifactId>langchain4j</artifactId>
-    <version>0.32.0</version>  <!-- check for latest -->
-</dependency>
-<dependency>
-    <groupId>dev.langchain4j</groupId>
-    <artifactId>langchain4j-open-ai</artifactId>
-    <version>0.32.0</version>
-</dependency>
-<dependency>
-    <groupId>dev.langchain4j</groupId>
-    <artifactId>langchain4j-redis</artifactId>
-    <version>0.32.0</version>
-</dependency>
+```kotlin
+implementation("dev.langchain4j:langchain4j:0.32.0")       // check for latest
+implementation("dev.langchain4j:langchain4j-open-ai:0.32.0")
+implementation("dev.langchain4j:langchain4j-redis:0.32.0")
 ```
 
 ### The Ingestion Pipeline with LangChain4j
@@ -278,42 +262,23 @@ src/main/java/com/yourname/llmmemory/
 
 ---
 
-## New Dependencies to Add
+## New Dependencies to Add (build.gradle.kts)
 
-```xml
-<!-- Jsoup for HTML parsing -->
-<dependency>
-    <groupId>org.jsoup</groupId>
-    <artifactId>jsoup</artifactId>
-    <version>1.17.2</version>
-</dependency>
+```kotlin
+// Jsoup for HTML parsing
+implementation("org.jsoup:jsoup:1.17.2")
 
-<!-- LangChain4j core -->
-<dependency>
-    <groupId>dev.langchain4j</groupId>
-    <artifactId>langchain4j</artifactId>
-    <version>0.32.0</version>
-</dependency>
+// LangChain4j core
+implementation("dev.langchain4j:langchain4j:0.32.0")
 
-<!-- LangChain4j OpenAI -->
-<dependency>
-    <groupId>dev.langchain4j</groupId>
-    <artifactId>langchain4j-open-ai</artifactId>
-    <version>0.32.0</version>
-</dependency>
+// LangChain4j OpenAI
+implementation("dev.langchain4j:langchain4j-open-ai:0.32.0")
 
-<!-- LangChain4j Redis -->
-<dependency>
-    <groupId>dev.langchain4j</groupId>
-    <artifactId>langchain4j-redis</artifactId>
-    <version>0.32.0</version>
-</dependency>
+// LangChain4j Redis
+implementation("dev.langchain4j:langchain4j-redis:0.32.0")
 
-<!-- Redis client -->
-<dependency>
-    <groupId>io.lettuce</groupId>
-    <artifactId>lettuce-core</artifactId>
-</dependency>
+// Redis client
+implementation("io.lettuce:lettuce-core")
 ```
 
 ---

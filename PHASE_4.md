@@ -20,14 +20,15 @@ You have two things that need to run:
 # Stage 1: Build
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /app
-COPY pom.xml .
+COPY build.gradle.kts settings.gradle.kts gradlew ./
+COPY gradle ./gradle
 COPY src ./src
-RUN ./mvnw package -DskipTests
+RUN ./gradlew bootJar -x test
 
 # Stage 2: Run
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/build/libs/*.jar app.jar
 
 # Don't run as root
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -274,12 +275,9 @@ spec:
 
 ### Spring Boot Actuator (Required for K8s Probes)
 
-Add to `pom.xml`:
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
+Add to `build.gradle.kts`:
+```kotlin
+implementation("org.springframework.boot:spring-boot-starter-actuator")
 ```
 
 Add to `application.properties`:
