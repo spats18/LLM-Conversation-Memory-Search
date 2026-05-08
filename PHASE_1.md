@@ -126,6 +126,21 @@ Conversation:
 {raw_content}
 ```
 
+### Failure handling — SummarizationException
+
+`SummarizationService.summarize()` throws a custom checked `SummarizationException` when:
+- the OpenAI API returns a 4xx/5xx
+- a network error occurs (timeout, connection refused, etc.)
+- the response body is missing the expected `choices[0].message.content` shape
+
+`ConversationService` catches this and stores the conversation with `summary = "[SUMMARIZATION_FAILED]"` so the row is still saved and queryable. A real dead-letter queue / retry mechanism is deferred to Phase 2.
+
+### Configuration
+
+`OpenAiConfig`:
+- Binds `openai.api.key`, `openai.api.url`, `openai.api.model` from `application.properties`
+- Exposes `RestTemplate` as a Spring bean for injection into `SummarizationService`
+
 ---
 
 ## Chunking in Phase 1

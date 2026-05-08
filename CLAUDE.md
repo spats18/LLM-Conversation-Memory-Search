@@ -49,13 +49,20 @@ Stack active right now: Spring Boot 3.x, PostgreSQL, direct OpenAI HTTP call.
 No LangChain4j. No Redis. No embeddings. No agents.
 
 Completed so far:
-- [ ] Project scaffolded
-- [ ] Conversation entity + repository
-- [ ] ConversationChunk entity + repository
+- [x] Project scaffolded
+- [x] Conversation entity + repository
+- [x] ConversationChunk entity + repository
 - [ ] POST /api/conversations endpoint
-- [ ] Summarization via direct OpenAI call
+- [x] Summarization via direct OpenAI call
 - [ ] GET /api/conversations (paginated)
 - [ ] GET /api/conversations/search (keyword)
+
+Design decisions made during Phase 1:
+- Summarization failures throw a custom `SummarizationException` instead of returning null;
+  the caller catches it and stores the conversation with `summary = "[SUMMARIZATION_FAILED]"`
+  so failed rows are still queryable. Dead-letter queue is deferred to Phase 2+.
+- `OpenAiConfig` exposes `RestTemplate` as a Spring bean and binds `openai.api.*` properties.
+- Chunk size is configurable via `app.chunking.size` so Phase 2 can tune without recompiling.
 
 Update these checkboxes as work is done.
 

@@ -10,6 +10,7 @@ build/
 .classpath
 .project
 .settings/
+.vscode/
 
 # Secrets — never commit these
 src/main/resources/application-local.properties

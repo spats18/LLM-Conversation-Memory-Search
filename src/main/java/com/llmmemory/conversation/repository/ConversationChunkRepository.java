@@ -1,5 +1,7 @@
-package com.llmmemory.conversation;
+package com.llmmemory.conversation.repository;
 
+import com.llmmemory.conversation.domain.ConversationChunk;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -10,4 +12,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 //   - UUID: the type of its primary key
 // Free methods available: save(), findById(), findAll(), deleteById()
 public interface ConversationChunkRepository extends JpaRepository<ConversationChunk, UUID> {
+  List<ConversationChunk> findByConversationIdOrderByChunkIndex(UUID conversationId);
 }
