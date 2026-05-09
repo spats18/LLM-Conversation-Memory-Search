@@ -1,4 +1,4 @@
-package com.llmmemory.conversation.domain;
+package com.llmmemory.conversation.domain.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

@@ -1,14 +1,17 @@
 package com.llmmemory.conversation.service;
 
-import com.llmmemory.conversation.domain.Conversation;
-import com.llmmemory.conversation.domain.ConversationChunk;
+import org.springframework.stereotype.Service;
+
+import com.llmmemory.conversation.domain.entity.Conversation;
+import com.llmmemory.conversation.domain.entity.ConversationChunk;
 import com.llmmemory.conversation.repository.ConversationChunkRepository;
 import com.llmmemory.conversation.repository.ConversationRepository;
 import com.llmmemory.summarization.exception.SummarizationException;
 import com.llmmemory.summarization.service.SummarizationService;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
@@ -29,14 +32,14 @@ public class ConversationService {
     this.chunkSize = chunkSize;
   }
 
-  public Conversation createConversation(String title, String rawContent, String source) {
+  @Transactional
+  public Conversation createConversation(String title, String source, String rawContent) {
     String summarized;
     try {
       summarized = summarizationService.summarize(rawContent);
     } catch (SummarizationException e) {
-      // Handle the exception, e.g., log it and return an error message
       log.error("Error summarizing conversation: {}", e.getMessage(), e);
-      summarized = "Summary unavailable due to an error while summarizing: " + e.getMessage();
+      summarized = "[SUMMARIZATION_FAILED]";
     }
 
     // Save Conversation
@@ -47,8 +50,10 @@ public class ConversationService {
     conversation.setSummary(summarized);
     conversationRepository.save(conversation);
 
-    // Chunk the raw content — split by \n\n or every 500 characters
-    // save each chunk as a ConversationChunk
+    // Fixed-window chunking: split into consecutive non-overlapping slices of
+    // chunkSize chars.
+    // Phase 2 will replace this with smarter chunking (overlap, sentence
+    // boundaries).
     int chunkCounts = (int) Math.ceil((double) rawContent.length() / chunkSize);
 
     for (int chunkIndex = 0; chunkIndex < chunkCounts; chunkIndex++) {

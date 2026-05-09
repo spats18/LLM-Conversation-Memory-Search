@@ -66,14 +66,15 @@ Why chunks? Because one conversation can be long. You will search at the chunk l
 
 ## API Endpoints
 
-### POST /api/conversations
+### POST /api/v1/conversations
 Accepts a conversation in raw text form. Stores it, generates a summary, indexes it.
 
 **Request body:**
 ```json
 {
   "title": "My conversation about Spring Boot",
-  "content": "User: How do I set up Spring Boot?\nAssistant: First, go to start.spring.io..."
+  "source": "paste",
+  "rawContent": "User: How do I set up Spring Boot?\nAssistant: First, go to start.spring.io..."
 }
 ```
 
@@ -87,12 +88,12 @@ Accepts a conversation in raw text form. Stores it, generates a summary, indexes
 }
 ```
 
-### GET /api/conversations
+### GET /api/v1/conversations
 Returns a paginated list of all stored conversations with their summaries.
 
 **Query params:** `page`, `size`
 
-### GET /api/conversations/search
+### GET /api/v1/conversations/search
 Keyword search across summaries and content.
 
 **Query params:** `q` (the search query)

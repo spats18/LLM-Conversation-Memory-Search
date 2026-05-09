@@ -31,12 +31,11 @@ public class SummarizationService {
     Map<String, String> message = new HashMap<>();
     message.put("role", "user");
 
-    String systemPrompt =
-        "You are a helpful assistant that summarizes conversations. "
-            + "Your task is to read the following conversation and provide a concise summary of the key points discussed."
-            + "Focus on the main topics, decisions made, and any action items mentioned. "
-            + "Avoid including minor details or off-topic discussions. "
-            + "The summary should be clear and easy to understand, capturing the essence of the conversation without losing important information.";
+    String systemPrompt = "You are a helpful assistant that summarizes conversations. "
+        + "Your task is to read the following conversation and provide a concise summary of the key points discussed."
+        + "Focus on the main topics, decisions made, and any action items mentioned. "
+        + "Avoid including minor details or off-topic discussions. "
+        + "The summary should be clear and easy to understand, capturing the essence of the conversation without losing important information.";
 
     message.put("content", systemPrompt + "\n\nConversation:\n" + rawContent);
 
@@ -50,15 +49,15 @@ public class SummarizationService {
     HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
 
     try {
-      Map<String, Object> response =
-          restTemplate.postForEntity(openAiConfig.getUrl(), requestEntity, Map.class).getBody();
+      Map<String, Object> response = restTemplate.postForEntity(openAiConfig.getUrl(), requestEntity, Map.class)
+          .getBody();
       if (response == null
           || !response.containsKey("choices")
           || ((List<?>) response.get("choices")).isEmpty()) {
         throw new SummarizationException("Invalid response from OpenAI API: " + response);
       }
       List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-      Map messageResponse = (Map) choices.get(0).get("message");
+      Map<String, Object> messageResponse = (Map<String, Object>) choices.get(0).get("message");
       return (String) messageResponse.get("content");
 
     } catch (HttpClientErrorException | HttpServerErrorException e) {

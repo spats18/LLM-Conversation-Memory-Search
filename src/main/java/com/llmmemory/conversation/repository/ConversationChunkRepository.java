@@ -1,9 +1,10 @@
 package com.llmmemory.conversation.repository;
 
-import com.llmmemory.conversation.domain.ConversationChunk;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.llmmemory.conversation.domain.entity.ConversationChunk;
 
 // Spring Data JPA implements this interface at runtime — no SQL needed
 // handles all database operations for chunks

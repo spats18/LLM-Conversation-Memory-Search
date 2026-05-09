@@ -1,11 +1,12 @@
 package com.llmmemory.conversation.repository;
 
-import com.llmmemory.conversation.domain.Conversation;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import com.llmmemory.conversation.domain.entity.Conversation;
 
 // Handles all database operations for the conversations table
 // Extends JpaRepository for free CRUD methods — save(), findAll(), findById(), deleteById()
