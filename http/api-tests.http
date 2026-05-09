@@ -1,0 +1,46 @@
+### List conversations - should return 200 OK with paginated list of conversations
+GET http://localhost:8080/api/v1/conversations?page=0&size=5   
+
+### Sorted by createdAt desc - should return newest conversations first with pagination
+GET http://localhost:8080/api/v1/conversations?page=0&size=5&sort=createdAt,desc
+
+### Sorted by createdAt asc - should return oldest conversations first
+GET http://localhost:8080/api/v1/conversations?sort=createdAt,asc&size=5
+
+### Create conversation - should return 201 Created with Location header and response body                                                                                                  
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{                                                                                                                                                
+"title": "Test",
+"source": "manual",
+"rawContent": "Some content here"
+}    
+
+### Validation FAILURE - missing title - should be 400 Bad Request
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{
+"source": "manual",
+"rawContent": "Some content here"
+}
+
+### Validation FAILURE - missing rawContent - should be 400 Bad Request
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{
+"title": "Test",
+"source": "manual"
+}
+
+### Validation FAILURE - Empty title - should be 400 Bad Request
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{
+"title": "",
+"source": "manual",
+"rawContent": "Some content here"
+}

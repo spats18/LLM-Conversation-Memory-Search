@@ -136,6 +136,10 @@ Conversation:
 
 `ConversationService` catches this and stores the conversation with `summary = "[SUMMARIZATION_FAILED]"` so the row is still saved and queryable. A real dead-letter queue / retry mechanism is deferred to Phase 2.
 
+### Validation error responses — GlobalExceptionHandler
+
+`GlobalExceptionHandler` (in `shared/exception`) is a `@RestControllerAdvice` that catches `MethodArgumentNotValidException` from `@Valid` failures on request bodies. It returns 400 with a `Map<String, String>` of `field → message`, e.g. `{ "title": "must not be blank" }`. Catch-all and per-domain exception handlers (e.g. `ConversationNotFoundException`) get added here as needed.
+
 ### Configuration
 
 `OpenAiConfig`:
@@ -166,9 +170,13 @@ src/main/java/com/yourname/llmmemory/
 │   ├── ConversationService.java       ← Business logic
 │   └── ConversationController.java    ← REST endpoints
 │
-└── summarization/
-    ├── SummarizationService.java      ← Direct OpenAI HTTP call
-    └── OpenAiConfig.java              ← API key, base URL
+├── summarization/
+│   ├── SummarizationService.java      ← Direct OpenAI HTTP call
+│   └── OpenAiConfig.java              ← API key, base URL
+│
+└── shared/
+    └── exception/
+        └── GlobalExceptionHandler.java  ← @RestControllerAdvice for validation errors
 ```
 
 ---
