@@ -26,4 +26,14 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.badRequest().body(errors);
     }
+
+    @ExceptionHandler(ConversationNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNotFound(ConversationNotFoundException ex) {
+        return ResponseEntity.status(404).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(DuplicateTitleException.class)
+    public ResponseEntity<Map<String, String>> handleDuplicateTitle(DuplicateTitleException ex) {
+        return ResponseEntity.status(409).body(Map.of("error", ex.getMessage()));
+    }
 }

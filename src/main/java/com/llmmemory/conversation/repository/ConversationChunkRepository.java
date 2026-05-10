@@ -14,4 +14,8 @@ import com.llmmemory.conversation.domain.entity.ConversationChunk;
 // Free methods available: save(), findById(), findAll(), deleteById()
 public interface ConversationChunkRepository extends JpaRepository<ConversationChunk, UUID> {
   List<ConversationChunk> findByConversationIdOrderByChunkIndex(UUID conversationId);
+
+  // Derived delete query — Spring Data JPA generates the DELETE.
+  // Caller must run inside a transaction (ConversationService.deleteConversation provides it).
+  void deleteByConversationId(UUID conversationId);
 }

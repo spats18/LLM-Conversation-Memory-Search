@@ -19,3 +19,4 @@ src/main/resources/application-local.properties
 .DS_Store
 CLAUDE.md
 DEV_COMMANDS.md
+DESIGN_DECISIONS (for interview prep).md

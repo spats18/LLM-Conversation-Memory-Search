@@ -18,7 +18,10 @@ public class Conversation {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  // VARCHAR by default — titles are short, no need for TEXT
+  // VARCHAR by default — titles are short, no need for TEXT.
+  // unique=true and nullable=false enforce the constraint at the schema level;
+  // ConversationService also checks existsByTitle for a clean 409 before INSERT.
+  @Column(unique = true, nullable = false)
   private String title;
 
   // Tracks where the conversation came from: "paste", "url", "file"
@@ -37,8 +40,7 @@ public class Conversation {
   // LocalDateTime: standard Java date-time type, maps cleanly to Postgres TIMESTAMP
   @CreationTimestamp private LocalDateTime createdAt;
 
-  // Stores the Postgres tsvector value for full-text keyword search
-  // String for now — Postgres will populate this via a trigger or manual update
-  @Column(columnDefinition = "tsvector")
-  private String searchVector;
+  // Note: the `search_vector` tsvector column lives in Postgres only.
+  // It is a GENERATED column derived from title + raw_content and JPA does not map it.
+  // Search queries reference it directly via native SQL.
 }

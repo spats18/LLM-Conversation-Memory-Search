@@ -1,5 +1,7 @@
 # Phase 1 — MVP: Paste, Store, Keyword Search
 
+> **Status: ✅ Code complete.** All endpoints (POST, GET list, GET search, DELETE) are implemented and tested manually via `http/api-tests.http`. Two understanding-checkpoints remain in the "Done When..." list at the bottom — those are about being able to explain the system in an interview, not code state.
+
 ## Goal
 
 Get something **working end to end** before introducing any complexity.
@@ -20,7 +22,8 @@ This phase is about understanding the **shape of the data** and building the ske
 By the end of Phase 1, you can:
 1. POST a conversation → it gets stored with a summary
 2. GET all conversations → paginated list
-3. GET /search?q=your query → keyword match against summaries and content
+3. GET /search?query=your query → keyword match against summaries and content
+4. DELETE a conversation by id → removes the conversation and its chunks
 
 ---
 
@@ -94,21 +97,22 @@ Returns a paginated list of all stored conversations with their summaries.
 **Query params:** `page`, `size`
 
 ### GET /api/v1/conversations/search
-Keyword search across summaries and content.
+Keyword search across `title` and `raw_content`. Backed by a Postgres `tsvector`
+generated column with a GIN index.
 
-**Query params:** `q` (the search query)
+**Query params:** `query` (the search term, required), `page`, `size`
 
-**Response:**
-```json
-[
-  {
-    "id": "uuid-here",
-    "title": "My conversation about Spring Boot",
-    "summary": "A conversation about setting up...",
-    "relevanceScore": 0.87
-  }
-]
-```
+**Response:** the same `PagedResponse<ConversationResponse>` shape as the list endpoint.
+
+### DELETE /api/v1/conversations/{id}
+Removes a conversation and all its chunks in a single transaction.
+
+- **204 No Content** on success
+- **404 Not Found** with `{ "error": "Conversation not found: <id>" }` if the id does not exist
+
+The service deletes chunks first because the FK on `conversation_chunks.conversation_id`
+has no `ON DELETE CASCADE`. Adding cascade is deferred — for Phase 1 the explicit
+two-step delete is acceptable and easier to reason about.
 
 ---
 
@@ -138,7 +142,24 @@ Conversation:
 
 ### Validation error responses — GlobalExceptionHandler
 
-`GlobalExceptionHandler` (in `shared/exception`) is a `@RestControllerAdvice` that catches `MethodArgumentNotValidException` from `@Valid` failures on request bodies. It returns 400 with a `Map<String, String>` of `field → message`, e.g. `{ "title": "must not be blank" }`. Catch-all and per-domain exception handlers (e.g. `ConversationNotFoundException`) get added here as needed.
+`GlobalExceptionHandler` (in `shared/exception`) is a `@RestControllerAdvice` that catches `MethodArgumentNotValidException` from `@Valid` failures on request bodies. It returns 400 with a `Map<String, String>` of `field → message`, e.g. `{ "title": "must not be blank" }`. It also handles `ConversationNotFoundException` → 404 and `DuplicateTitleException` → 409, both with `{ "error": "..." }`. Catch-all and additional per-domain handlers get added here as needed.
+
+### Title uniqueness — defense in depth
+
+Conversations must have unique titles. Enforced at two layers:
+
+1. **DB constraint:** `UNIQUE` on `conversations.title` is the source of truth. Concurrent inserts can't both succeed.
+2. **App-level check:** `ConversationService.createConversation` calls `existsByTitle` before the INSERT and throws `DuplicateTitleException` → 409 if the title is taken. Cleaner error response than letting the DB throw and translating later.
+
+`ddl-auto=update` is unreliable for adding unique constraints to existing tables, so the constraint was applied manually:
+```sql
+ALTER TABLE conversations ADD CONSTRAINT uk_conversations_title UNIQUE (title);
+```
+Phase 2+ replaces manual DDL with Flyway migrations.
+
+### Search storage — generated tsvector column
+
+`conversations.search_vector` is a Postgres `GENERATED ALWAYS AS (...) STORED` column derived from `title || ' ' || raw_content`. JPA does not map it (no field on the `Conversation` entity). Postgres recomputes it on every insert/update; the GIN index `idx_conversations_search_vector` makes `@@ plainto_tsquery(...)` matches fast. The migration was applied manually via psql in Phase 1; a real migration tool (Flyway/Liquibase) lands in Phase 2+.
 
 ### Configuration
 
@@ -229,9 +250,10 @@ openai.model=gpt-4o-mini
 
 ## Phase 1 Done When...
 
-- [ ] You can POST a raw conversation text and get it stored with a summary
-- [ ] You can GET a list of all conversations
-- [ ] You can search with a keyword and get relevant results back
+- [x] You can POST a raw conversation text and get it stored with a summary
+- [x] You can GET a list of all conversations
+- [x] You can search with a keyword and get relevant results back
+- [x] You can DELETE a conversation by id (chunks go with it)
 - [ ] You understand exactly what each class does and why it exists
 - [ ] You can explain the data model and why there are two tables
 

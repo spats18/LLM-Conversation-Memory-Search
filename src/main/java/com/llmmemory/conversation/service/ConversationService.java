@@ -1,11 +1,15 @@
 package com.llmmemory.conversation.service;
 
+import java.util.UUID;
+
 import org.springframework.stereotype.Service;
 
 import com.llmmemory.conversation.domain.entity.Conversation;
 import com.llmmemory.conversation.domain.entity.ConversationChunk;
 import com.llmmemory.conversation.repository.ConversationChunkRepository;
 import com.llmmemory.conversation.repository.ConversationRepository;
+import com.llmmemory.shared.exception.ConversationNotFoundException;
+import com.llmmemory.shared.exception.DuplicateTitleException;
 import com.llmmemory.summarization.exception.SummarizationException;
 import com.llmmemory.summarization.service.SummarizationService;
 
@@ -34,6 +38,13 @@ public class ConversationService {
 
   @Transactional
   public Conversation createConversation(String title, String source, String rawContent) {
+    // App-level check for a clean 409 before we attempt the INSERT.
+    // The DB UNIQUE constraint on title is the source of truth — concurrent
+    // requests that race past this check will still be rejected by Postgres.
+    if (conversationRepository.existsByTitle(title)) {
+      throw new DuplicateTitleException(title);
+    }
+
     String summarized;
     try {
       summarized = summarizationService.summarize(rawContent);
@@ -68,5 +79,17 @@ public class ConversationService {
       conversationChunkRepository.save(chunk);
     }
     return conversation;
+  }
+
+  // Deletes a conversation along with all its chunks. Single transaction so
+  // either both deletes succeed or neither does. Chunks must go first because
+  // the FK on conversation_chunks.conversation_id has no ON DELETE CASCADE.
+  @Transactional
+  public void deleteConversation(UUID id) {
+    if (!conversationRepository.existsById(id)) {
+      throw new ConversationNotFoundException(id);
+    }
+    conversationChunkRepository.deleteByConversationId(id);
+    conversationRepository.deleteById(id);
   }
 }

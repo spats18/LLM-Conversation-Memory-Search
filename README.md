@@ -59,14 +59,14 @@ Each technology was chosen for a specific reason:
 
 The project is built **incrementally**. Each phase produces something that works and can be demonstrated. You never break what you already have.
 
-### Phase 1 — MVP: Paste, Store, Keyword Search
+### Phase 1 — MVP: Paste, Store, Keyword Search ✅ Complete
 > **Goal:** Get something working end to end. No AI yet. No fancy search. Just the skeleton.
 
-- Spring Boot REST API
-- Accept raw pasted conversation text via API
-- Store in PostgreSQL (simple, no vector stuff yet)
-- Basic keyword search
-- Manual summarization prompt (you write the summary, or call OpenAI directly with no LangChain)
+- Spring Boot REST API with POST / GET list / GET search / DELETE endpoints
+- PostgreSQL with `tsvector` generated column + GIN index for keyword search
+- Direct OpenAI HTTP call for summarization (no LangChain), with `[SUMMARIZATION_FAILED]` fallback so failed rows are still stored
+- Centralized `@RestControllerAdvice` for validation (400) and not-found (404) error responses
+- Smoke tests in `http/api-tests.http` (VS Code REST Client)
 
 👉 See [PHASE_1.md](./PHASE_1.md)
 

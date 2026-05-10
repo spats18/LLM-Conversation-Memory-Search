@@ -1,5 +1,5 @@
 ### List conversations - should return 200 OK with paginated list of conversations
-GET http://localhost:8080/api/v1/conversations?page=0&size=5   
+GET http://localhost:8080/api/v1/conversations?page=0&size=5
 
 ### Sorted by createdAt desc - should return newest conversations first with pagination
 GET http://localhost:8080/api/v1/conversations?page=0&size=5&sort=createdAt,desc
@@ -7,15 +7,62 @@ GET http://localhost:8080/api/v1/conversations?page=0&size=5&sort=createdAt,desc
 ### Sorted by createdAt asc - should return oldest conversations first
 GET http://localhost:8080/api/v1/conversations?sort=createdAt,asc&size=5
 
-### Create conversation - should return 201 Created with Location header and response body                                                                                                  
+### DELETE - non-existent id should return 404 with error body
+DELETE http://localhost:8080/api/v1/conversations/00000000-0000-0000-0000-000000000000
+
+### DELETE - cleanup before re-creating Manual Brushing (paste id from a prior GET)
+DELETE http://localhost:8080/api/v1/conversations/41306c70-c7eb-40f1-8254-8acac2a739f3
+
+### Create conversation - Manual Brushing vs Hand brushing
 POST http://localhost:8080/api/v1/conversations
 Content-Type: application/json
 
-{                                                                                                                                                
-"title": "Test",
-"source": "manual",
-"rawContent": "Some content here"
-}    
+{
+  "title": "Manual Brushing vs Hand brushing: Which is Better for Oral Health?",
+  "source": "manual",
+  "rawContent": "Both manual and electric (hand-powered) toothbrushes can effectively remove plaque and improve oral health, but studies show electric toothbrushes are generally more efficient, reducing plaque by up to 21% more than manual brushes over three months. Electric brushes are ideal for limited mobility, children, and ensuring proper timing, while manual brushes are cost-effective and portable.\n\nThis video explains the differences between manual and electric toothbrushes:54s\nhttps://www.youtube.com/watch?v=YiHNZ_MI_Bg&t=20\n\nManual Toothbrushes (Hand Brushing)\nPros: Highly cost-effective, widely available, no batteries or charging required, and highly portable.\nCons: Requires good manual dexterity and proper technique (circular motions rather than scrubbing).\nEffectiveness: As effective as electric if used correctly for a full two minutes.\n\nElectric Toothbrushes (Powered Brushing)\nPros: Generally more efficient at reducing plaque and gingivitis, particularly with oscillation/rotation. Many feature timers and pressure sensors to prevent brushing too hard.\nCons: Higher initial cost, requires charging, and may feel too intense for sensitive gums.\nEffectiveness: Beneficial for those with braces, gum disease, or limited hand mobility.\n\nKey Takeaways\nTechnique Matters: The American Dental Association (ADA) notes that both are effective if used properly.\nBest For: Electric is often recommended for better plaque removal and ease of use, while manual is perfect for those on a budget who maintain excellent technique.\nRecommendation: Use soft bristles to avoid enamel abrasion or gum recession."
+}
+
+### Create conversation - Laptop keyboard
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{
+    "title": "What is the best way to clean a laptop keyboard?",
+    "source": "manual",
+    "rawContent": "The best way to clean a laptop keyboard involves several steps to ensure you remove dust, debris, and germs without damaging the keys. Here’s a simple guide:\n\n1. Power Off: Always turn off your laptop and unplug it before cleaning to avoid any electrical issues.\n\n2. Remove Loose Debris: Use a can of compressed air to blow out dust and crumbs from between the keys. Hold the can upright and use short bursts of air.\n\n3. Clean Key Surfaces: Dampen a microfiber cloth with a mixture of water and isopropyl alcohol (70% or higher). Gently wipe down the key surfaces and surrounding areas. Avoid using too much liquid, as it can seep into the keyboard.\n\n4. Detail Cleaning: For stubborn grime, use cotton swabs dipped in the alcohol solution to clean around the edges of the keys.\n\n5. Dry Thoroughly: Allow the keyboard to air dry completely before powering on your laptop again.\n\n6. Regular Maintenance: To keep your keyboard clean, consider using a keyboard cover and regularly wiping it down with disinfectant wipes."
+}
+
+### Create conversation - Best time to Brush Teeth
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{
+    "title": "Best time to Brush Teeth",
+    "rawContent": "The best time to brush your teeth is at least twice a day: once in the morning and once before bed. Brushing in the morning helps remove plaque that has built up overnight and freshens your breath for the day ahead. Brushing before bed is crucial because it removes food particles and plaque that have accumulated throughout the day, reducing the risk of cavities and gum disease while you sleep. Additionally, it's beneficial to wait at least 30 minutes after eating or drinking acidic foods or beverages before brushing, as this allows your saliva to neutralize acids and prevents enamel erosion."
+}
+
+### Duplicate title - run AFTER a successful create with the same title; should be 409 Conflict
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{
+  "title": "Best time to Brush Teeth",
+  "source": "manual",
+  "rawContent": "Different content but same title — should be rejected as duplicate."
+}
+
+### Search - keyword match across title + raw_content
+GET http://localhost:8080/api/v1/conversations/search?query=brushing&page=0&size=5
+
+### Search - phrase (plainto_tsquery handles tokenization)
+GET http://localhost:8080/api/v1/conversations/search?query=electric%20toothbrush&size=10
+
+### Search - no results expected
+GET http://localhost:8080/api/v1/conversations/search?query=quantumcryptography
+
+### Search - missing query param should return 400
+GET http://localhost:8080/api/v1/conversations/search
 
 ### Validation FAILURE - missing title - should be 400 Bad Request
 POST http://localhost:8080/api/v1/conversations
@@ -43,4 +90,14 @@ Content-Type: application/json
 "title": "",
 "source": "manual",
 "rawContent": "Some content here"
+}
+
+### Duplicate title - run AFTER a successful create with the same title; should be 409 Conflict
+POST http://localhost:8080/api/v1/conversations
+Content-Type: application/json
+
+{
+  "title": "Best time to Brush Teeth",
+  "source": "manual",
+  "rawContent": "Different content but same title — should be rejected as duplicate."
 }
