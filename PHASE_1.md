@@ -1,29 +1,19 @@
 # Phase 1 — MVP: Paste, Store, Keyword Search
 
-> **Status: ✅ Code complete.** All endpoints (POST, GET list, GET search, DELETE) are implemented and tested manually via `http/api-tests.http`. Two understanding-checkpoints remain in the "Done When..." list at the bottom — those are about being able to explain the system in an interview, not code state.
+> **Status: ✅ Complete.** All endpoints (POST, GET list, GET search, DELETE) implemented and verified via `http/api-tests.http`.
 
 ## Goal
 
-Get something **working end to end** before introducing any complexity.
-
-No LangChain yet. No Redis. No embeddings. No AI magic. Just a Spring Boot app that accepts a conversation, stores it, and lets you search it.
-
-This phase is about understanding the **shape of the data** and building the skeleton that every later phase will build on.
+Phase 1 establishes the end-to-end skeleton — Spring Boot + PostgreSQL + a direct summarization call — before LangChain4j, Redis, embeddings, or agents enter the stack. Every later phase builds on this foundation.
 
 ---
 
-## What You Will Build
+## What Phase 1 Is
 
-- A Spring Boot REST API with three endpoints
-- A PostgreSQL database with two tables
-- A simple service that accepts raw conversation text, stores it, and lets you search by keyword
-- A minimal summarization step using direct OpenAI API call (no framework — just an HTTP call)
-
-By the end of Phase 1, you can:
-1. POST a conversation → it gets stored with a summary
-2. GET all conversations → paginated list
-3. GET /search?query=your query → keyword match against summaries and content
-4. DELETE a conversation by id → removes the conversation and its chunks
+- Spring Boot REST API: `POST`, `GET` list, `GET` search, `DELETE` (details under [API Endpoints](#api-endpoints))
+- PostgreSQL with two tables: `conversations` and `conversation_chunks`
+- Summarization via a direct OpenAI HTTP call — no framework, just `RestTemplate`
+- Keyword search via a Postgres `tsvector` generated column with a GIN index
 
 ---
 
@@ -63,7 +53,7 @@ CREATE TABLE conversation_chunks (
 );
 ```
 
-Why chunks? Because one conversation can be long. You will search at the chunk level in Phase 2 (with embeddings). In Phase 1, the chunk table just stores the raw pieces so you get used to thinking in chunks now.
+Chunks exist now (rather than in Phase 2) so the schema is in place when semantic search lands. Phase 1 stores them as raw fixed-size slices; Phase 2 adds embeddings on the same table.
 
 ---
 
@@ -118,9 +108,7 @@ two-step delete is acceptable and easier to reason about.
 
 ## Summarization in Phase 1
 
-Make a **direct HTTP call to the OpenAI API** from the Java service. No LangChain. No abstraction. Just `RestTemplate` or `WebClient` calling `https://api.openai.com/v1/chat/completions`.
-
-This deliberate choice makes the value of LangChain4j's abstraction visible when it's introduced in Phase 2 — you will have already experienced the verbose alternative.
+Direct HTTP call to `https://api.openai.com/v1/chat/completions` via `RestTemplate`. No LangChain in Phase 1 — the abstraction lands in Phase 2 once the verbose baseline exists for comparison.
 
 Summarization prompt (Phase 1):
 ```
@@ -138,7 +126,9 @@ Conversation:
 - a network error occurs (timeout, connection refused, etc.)
 - the response body is missing the expected `choices[0].message.content` shape
 
-`ConversationService` catches this and stores the conversation with `summary = "[SUMMARIZATION_FAILED]"` so the row is still saved and queryable. A real dead-letter queue / retry mechanism is deferred to Phase 2.
+`ConversationService` catches this and stores the conversation with `summary = "[SUMMARIZATION_FAILED]"` so the row is still saved and queryable.
+
+**Retry plan (Phase 2+):** an overnight cron job filters `conversations` where `summary = '[SUMMARIZATION_FAILED]'` and re-requests summarization for each. A full dead-letter queue is deferred until volume justifies it.
 
 ### Validation error responses — GlobalExceptionHandler
 
@@ -171,91 +161,7 @@ Phase 2+ replaces manual DDL with Flyway migrations.
 
 ## Chunking in Phase 1
 
-Keep it simple. Split the conversation by `\n\n` (double newline) or every N characters (e.g., 500 characters). Store each chunk in `conversation_chunks`.
-
-You are not doing anything smart with chunks yet. You are just getting used to the concept and making sure the table exists for Phase 2.
-
----
-
-## Spring Boot Project Structure
-
-```
-src/main/java/com/yourname/llmmemory/
-├── LlmMemoryApplication.java
-│
-├── conversation/
-│   ├── Conversation.java              ← JPA entity
-│   ├── ConversationChunk.java         ← JPA entity
-│   ├── ConversationRepository.java    ← Spring Data JPA
-│   ├── ConversationChunkRepository.java
-│   ├── ConversationService.java       ← Business logic
-│   └── ConversationController.java    ← REST endpoints
-│
-├── summarization/
-│   ├── SummarizationService.java      ← Direct OpenAI HTTP call
-│   └── OpenAiConfig.java              ← API key, base URL
-│
-└── shared/
-    └── exception/
-        └── GlobalExceptionHandler.java  ← @RestControllerAdvice for validation errors
-```
-
----
-
-## Dependencies (build.gradle.kts)
-
-```kotlin
-dependencies {
-    // Spring Boot
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-
-    // PostgreSQL
-    runtimeOnly("org.postgresql:postgresql")
-
-    // Validation
-    implementation("org.springframework.boot:spring-boot-starter-validation")
-
-    // Lombok (optional but saves boilerplate)
-    compileOnly("org.projectlombok:lombok")
-    annotationProcessor("org.projectlombok:lombok")
-}
-```
-
----
-
-## application.properties
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/llmmemory
-spring.datasource.username=postgres
-spring.datasource.password=yourpassword
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-
-openai.api.key=${OPENAI_API_KEY}
-openai.api.url=https://api.openai.com/v1/chat/completions
-openai.model=gpt-4o-mini
-```
-
----
-
-## Things to Think About While Building
-
-- How should you handle a conversation that is too long to summarize in one call? (You will solve this in Phase 2 with chunking + LangChain4j, but think about it now)
-- What happens if the OpenAI call fails? Should you still store the conversation without a summary?
-- What does "keyword search" miss that you wish it could do? (This will be your motivation for Phase 2 semantic search)
-
----
-
-## Phase 1 Done When...
-
-- [x] You can POST a raw conversation text and get it stored with a summary
-- [x] You can GET a list of all conversations
-- [x] You can search with a keyword and get relevant results back
-- [x] You can DELETE a conversation by id (chunks go with it)
-- [ ] You understand exactly what each class does and why it exists
-- [ ] You can explain the data model and why there are two tables
+Fixed-size split: every N characters where N is `app.chunking.size` (default 500). Each chunk becomes a row in `conversation_chunks` with its `chunk_index`. Semantic chunking and embeddings land in Phase 2.
 
 ---
 
@@ -267,5 +173,3 @@ openai.model=gpt-4o-mini
 - No semantic search (Phase 2)
 - No agents (Phase 3)
 - No Docker (Phase 4)
-
-Resist the urge to add these now. Build the foundation solid first.

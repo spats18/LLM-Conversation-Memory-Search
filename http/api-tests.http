@@ -11,8 +11,7 @@ GET http://localhost:8080/api/v1/conversations?sort=createdAt,asc&size=5
 DELETE http://localhost:8080/api/v1/conversations/00000000-0000-0000-0000-000000000000
 
 ### DELETE - cleanup before re-creating Manual Brushing (paste id from a prior GET)
-DELETE http://localhost:8080/api/v1/conversations/41306c70-c7eb-40f1-8254-8acac2a739f3
-
+DELETE http://localhost:8080/api/v1/conversations/{conversationId}
 ### Create conversation - Manual Brushing vs Hand brushing
 POST http://localhost:8080/api/v1/conversations
 Content-Type: application/json
@@ -53,7 +52,7 @@ Content-Type: application/json
 }
 
 ### Search - keyword match across title + raw_content
-GET http://localhost:8080/api/v1/conversations/search?query=brushing&page=0&size=5
+GET http://localhost:8080/api/v1/conversations/search?query=electric&page=0&size=5
 
 ### Search - phrase (plainto_tsquery handles tokenization)
 GET http://localhost:8080/api/v1/conversations/search?query=electric%20toothbrush&size=10
