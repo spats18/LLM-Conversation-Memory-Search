@@ -1,74 +1,22 @@
 # Phase 2 — Real Ingestion: URL Fetch + File Upload + LangChain4j + Redis
 
+> **Status: 🔲 Not started.**
+
 ## Goal
 
-Replace the manual pieces from Phase 1 with a **real, production-grade ingestion pipeline**.
+Phase 2 replaces the manual pieces from Phase 1 with a proper ingestion pipeline:
+- Two input sources: Claude share URL and exported JSON file
+- LangChain4j for chunking, summarization, and embedding
+- Redis Stack as the vector store
+- Semantic search replacing keyword search
 
-By the end of Phase 2, the system:
-- Accepts a Claude share URL → fetches and parses it automatically
-- Accepts an exported Claude JSON file → parses it correctly
-- Uses LangChain4j to orchestrate: chunk → summarize → embed
-- Stores embeddings in Redis Vector Store
-- Returns semantically relevant results — not just keyword matches
-
----
-
-## Why This Order Matters
-
-Phase 1 was built without LangChain4j or Redis on purpose. The manual OpenAI HTTP call is verbose, and keyword search has obvious gaps. Phase 2 replaces both with purpose-built tools — and the motivation for each is concrete rather than theoretical.
+Phase 1 used a direct `RestTemplate` call and Postgres `tsvector` search on purpose — the verbosity and keyword gaps make the Phase 2 abstractions concrete rather than theoretical.
 
 ---
 
-## Part A: Input Sources
+## Input Sources
 
-### Source 1: Claude Share URL
-
-When you share a Claude conversation, it becomes publicly accessible at a URL like:
-`https://claude.ai/share/some-unique-id`
-
-Your app will:
-1. Accept that URL from the user
-2. Make an HTTP GET request to fetch the page HTML
-3. Parse the HTML to extract the conversation turns (User / Assistant messages)
-4. Feed the parsed text into the ingestion pipeline
-
-**Technology to use:** `Jsoup` — a Java HTML parser. Simple, battle-tested.
-
-```kotlin
-implementation("org.jsoup:jsoup:1.17.2")
-```
-
-**Important caveat:** Claude's HTML structure can change. Your parser will be fragile — that is expected and honest. You should document this in your code. The interviewer will respect that you understood the tradeoff.
-
-**What to extract:**
-- The conversation title (if present)
-- Each message turn: role (User/Assistant) and content text
-- URL and fetch timestamp (for your records)
-
-### Source 2: Exported Claude JSON
-
-Claude lets you export your conversations as a JSON file. The structure looks roughly like:
-
-```json
-{
-  "title": "Conversation about Spring Boot",
-  "created_at": "2025-04-01T10:00:00Z",
-  "messages": [
-    {
-      "role": "user",
-      "content": "How do I set up Spring Boot?"
-    },
-    {
-      "role": "assistant",
-      "content": "First, go to start.spring.io..."
-    }
-  ]
-}
-```
-
-Your app will accept a file upload (multipart/form-data), parse this JSON using Jackson (already in Spring Boot), and feed it into the same ingestion pipeline.
-
-Both sources should produce the same internal `ParsedConversation` object. The pipeline does not care where the conversation came from.
+Both sources produce the same internal `ParsedConversation`. The ingestion pipeline is source-agnostic.
 
 ```java
 public class ParsedConversation {
@@ -84,30 +32,30 @@ public class ConversationTurn {
 }
 ```
 
----
+### Source 1: Claude Share URL
 
-## Part B: LangChain4j
+`POST /api/v1/conversations/ingest-url` accepts a Claude share URL (e.g. `https://claude.ai/share/some-id`). `UrlFetcherService` issues an HTTP GET via Jsoup, parses the HTML to extract the title and conversation turns, and hands a `ParsedConversation` to the ingestion pipeline.
 
-### What LangChain4j Is
+The HTML parser is intentionally fragile — Claude's share page structure can change without notice. This is documented in the code as a known tradeoff, not a bug.
 
-LangChain4j is the Java port of LangChain. It provides:
-- Abstractions for LLM calls (so you can swap OpenAI for Ollama with one line)
-- Document chunking (text splitters)
-- Embedding model wrappers
-- Vector store integrations (including Redis)
-- Chain and agent building blocks
+### Source 2: Exported Claude JSON
 
-### Dependency
+`POST /api/v1/conversations/ingest-file` accepts a multipart upload of an exported Claude JSON file. Jackson (already on the classpath) deserializes it. Expected structure:
 
-```kotlin
-implementation("dev.langchain4j:langchain4j:0.32.0")       // check for latest
-implementation("dev.langchain4j:langchain4j-open-ai:0.32.0")
-implementation("dev.langchain4j:langchain4j-redis:0.32.0")
+```json
+{
+  "title": "Conversation about Spring Boot",
+  "created_at": "2025-04-01T10:00:00Z",
+  "messages": [
+    { "role": "user", "content": "How do I set up Spring Boot?" },
+    { "role": "assistant", "content": "First, go to start.spring.io..." }
+  ]
+}
 ```
 
-### The Ingestion Pipeline with LangChain4j
+---
 
-Replace your manual `SummarizationService` with a proper LangChain4j pipeline:
+## Ingestion Pipeline
 
 ```
 ParsedConversation
@@ -116,25 +64,29 @@ ParsedConversation
   DocumentLoader         ← Convert ParsedConversation → LangChain4j Document
        │
        ▼
-  TextSplitter           ← Split into chunks (e.g., 500 tokens with 50 token overlap)
+  TextSplitter           ← 500-token chunks, 50-token overlap
        │
        ▼
-  SummarizationChain     ← For each chunk: call LLM to summarize
+  SummarizationService   ← Per-chunk LLM summarization (ChatLanguageModel)
        │
        ▼
-  EmbeddingModel         ← For each chunk+summary: generate vector embedding
+  EmbeddingService       ← Per-chunk embedding (EmbeddingModel)
        │
        ▼
   RedisVectorStore       ← Store chunk, summary, embedding, metadata
 ```
 
-**Why chunking overlap?** If you split at a hard boundary, context gets cut. With 50-token overlap, each chunk shares some content with its neighbors so nothing is lost at the seam.
+Chunk overlap is 50 tokens so nothing is lost at split boundaries — each chunk shares a tail with its successor.
 
-### Model Configuration (Swappable Design)
+---
+
+## Model Configuration
+
+Both `ChatLanguageModel` and `EmbeddingModel` are Spring beans. The underlying provider is a configuration detail — swapping OpenAI for Ollama requires only a property change and a module swap.
 
 ```java
-// OpenAI version
-ChatLanguageModel model = OpenAiChatModel.builder()
+// OpenAI (default)
+ChatLanguageModel chatModel = OpenAiChatModel.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
     .modelName("gpt-4o-mini")
     .build();
@@ -144,8 +96,8 @@ EmbeddingModel embeddingModel = OpenAiEmbeddingModel.builder()
     .modelName("text-embedding-3-small")
     .build();
 
-// Ollama version (swap without changing business logic)
-ChatLanguageModel model = OllamaChatModel.builder()
+// Ollama alternative (requires: implementation("dev.langchain4j:langchain4j-ollama"))
+ChatLanguageModel chatModel = OllamaChatModel.builder()
     .baseUrl("http://localhost:11434")
     .modelName("llama3.1:8b")
     .build();
@@ -156,18 +108,13 @@ EmbeddingModel embeddingModel = OllamaEmbeddingModel.builder()
     .build();
 ```
 
-This is the core value of LangChain4j's model abstraction — the underlying model is a configuration detail, not a structural dependency.
-
 ---
 
-## Part C: Redis Vector Store
+## Redis Vector Store
 
-### Why Redis Stack
+Redis Stack (RediSearch + RedisJSON) provides native vector similarity search. LangChain4j has a first-class integration — no manual index management needed.
 
-Redis Stack includes RediSearch and RedisJSON, which add native vector similarity search on top of the Redis data structures you already know. It's self-hostable, works well locally and in Kubernetes, and LangChain4j has a first-class integration for it.
-
-### Running Redis Locally
-
+Run locally:
 ```bash
 docker run -d --name redis-stack \
   -p 6379:6379 \
@@ -175,13 +122,11 @@ docker run -d --name redis-stack \
   redis/redis-stack:latest
 ```
 
-Port 8001 gives you RedisInsight — a web UI to inspect your data. Use it to see your vectors being stored.
+Port 8001 is RedisInsight — a web UI for inspecting stored documents and embeddings.
 
-### What Gets Stored in Redis
+Each chunk is stored as a Redis document:
 
-Each conversation chunk becomes a Redis document with:
-
-```
+```json
 {
   "chunk_id": "uuid",
   "conversation_id": "uuid",
@@ -189,106 +134,85 @@ Each conversation chunk becomes a Redis document with:
   "source_url": "https://claude.ai/share/...",
   "chunk_content": "The raw chunk text",
   "summary": "A summary of this chunk",
-  "embedding": [0.123, -0.456, ...],   ← 1536 dimensions for text-embedding-3-small
+  "embedding": [0.123, -0.456, ...],
   "created_at": "2025-04-27T10:00:00Z"
 }
 ```
 
-### Semantic Search
-
-When the user types a query:
-
-1. Embed the query using the same embedding model
-2. Run a KNN (k-nearest neighbors) similarity search in Redis
-3. Return the top N most similar chunks with their conversation metadata
-
-```java
-// Pseudocode
-List<Float> queryEmbedding = embeddingModel.embed(userQuery);
-List<SearchResult> results = redisVectorStore.findSimilar(queryEmbedding, topK = 5);
-```
-
-The difference from keyword search: if the user stored a conversation about "machine learning model training" and searches for "neural network optimization", semantic search finds it. Keyword search would not.
+`embedding` is 1536 dimensions for `text-embedding-3-small`.
 
 ---
 
-## Updated API Endpoints
+## Semantic Search
 
-### POST /api/conversations/ingest-url
+`GET /api/v1/conversations/search?q=...` in Phase 2 embeds the query and runs a KNN similarity search in Redis, replacing the Phase 1 Postgres `tsvector` approach. A query like "neural network optimization" surfaces a chunk about "machine learning model training" — semantic match, not token match.
+
+---
+
+## API Endpoints
+
+### POST /api/v1/conversations/ingest-url
 ```json
-{
-  "url": "https://claude.ai/share/abc123"
-}
+{ "url": "https://claude.ai/share/abc123" }
 ```
 
-### POST /api/conversations/ingest-file
+### POST /api/v1/conversations/ingest-file
 Multipart form upload of the exported JSON file.
 
-### GET /api/conversations/search?q=your+query
-Now uses semantic search instead of keyword search. Returns ranked results with relevance scores.
+### GET /api/v1/conversations/search?q=your+query
+Semantic search. Returns ranked results with relevance scores.
 
-### GET /api/conversations
-Same as Phase 1. Lists all stored conversations.
+### GET /api/v1/conversations
+Unchanged from Phase 1.
 
 ---
 
-## Updated Project Structure
+## Package Structure
 
 ```
-src/main/java/com/yourname/llmmemory/
-├── LlmMemoryApplication.java
-│
+src/main/java/com/llmmemory/
 ├── ingestion/
 │   ├── IngestionService.java          ← Orchestrates the full pipeline
-│   ├── UrlFetcherService.java         ← Fetches and parses Claude share URLs
-│   ├── FileParserService.java         ← Parses exported Claude JSON
+│   ├── UrlFetcherService.java         ← Jsoup fetch + HTML parse
+│   ├── FileParserService.java         ← Jackson parse of exported JSON
 │   ├── ParsedConversation.java        ← Common internal format
 │   └── ConversationTurn.java
 │
 ├── pipeline/
-│   ├── ChunkingService.java           ← LangChain4j text splitter wrapper
-│   ├── SummarizationService.java      ← LangChain4j LLM chain wrapper
-│   └── EmbeddingService.java          ← LangChain4j embedding model wrapper
+│   ├── ChunkingService.java           ← LangChain4j DocumentSplitter wrapper
+│   ├── SummarizationService.java      ← LangChain4j ChatLanguageModel wrapper
+│   └── EmbeddingService.java          ← LangChain4j EmbeddingModel wrapper
 │
 ├── storage/
 │   └── RedisVectorStoreService.java   ← Store and retrieve from Redis
 │
-├── search/
-│   └── SearchService.java             ← Embed query, search Redis, rank results
-│
-└── api/
-    └── ConversationController.java    ← Updated REST endpoints
+└── search/
+    └── SearchService.java             ← Embed query, KNN search, return ranked chunks
 ```
 
 ---
 
-## New Dependencies to Add (build.gradle.kts)
+## Dependencies (build.gradle.kts)
 
 ```kotlin
-// Jsoup for HTML parsing
+// HTML parsing
 implementation("org.jsoup:jsoup:1.17.2")
 
-// LangChain4j core
-implementation("dev.langchain4j:langchain4j:0.32.0")
-
-// LangChain4j OpenAI
-implementation("dev.langchain4j:langchain4j-open-ai:0.32.0")
-
-// LangChain4j Redis
-implementation("dev.langchain4j:langchain4j-redis:0.32.0")
-
-// Redis client
-implementation("io.lettuce:lettuce-core")
+// LangChain4j — BOM pins all module versions in sync
+implementation(platform("dev.langchain4j:langchain4j-bom:1.14.1"))
+implementation("dev.langchain4j:langchain4j")
+implementation("dev.langchain4j:langchain4j-open-ai")
+implementation("dev.langchain4j:langchain4j-redis")
 ```
 
 ---
 
 ## Phase 2 Done When...
 
-- [ ] POST a Claude share URL → conversation is fetched, parsed, chunked, summarized, embedded, stored in Redis
-- [ ] POST an exported JSON file → same pipeline, different input
+- [ ] POST a Claude share URL → conversation fetched, parsed, chunked, summarized, embedded, stored in Redis
+- [ ] POST an exported JSON file → same pipeline, different source
 - [ ] Semantic search returns results that keyword search would miss
-- [ ] Swapping from OpenAI to Ollama requires only a config change
+- [ ] Swapping OpenAI for Ollama requires only a config change
 - [ ] RedisInsight shows stored embeddings correctly
 
 ---
@@ -296,5 +220,5 @@ implementation("io.lettuce:lettuce-core")
 ## What Phase 2 Does NOT Do
 
 - No agent decision-making (Phase 3)
-- No Docker Compose setup (Phase 4)
+- No Docker Compose (Phase 4)
 - No Kubernetes (Phase 4)

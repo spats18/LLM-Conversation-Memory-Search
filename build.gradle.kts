@@ -25,6 +25,15 @@ dependencies {
 	annotationProcessor("org.projectlombok:lombok")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+	// Phase 2: HTML parsing
+	implementation("org.jsoup:jsoup:1.17.2")
+
+	// Phase 2: LangChain4j — BOM pins all module versions in sync
+	implementation(platform("dev.langchain4j:langchain4j-bom:1.14.1"))
+	implementation("dev.langchain4j:langchain4j")
+	implementation("dev.langchain4j:langchain4j-open-ai")
+	implementation("dev.langchain4j:langchain4j-redis")
 }
 
 tasks.withType<Test> {

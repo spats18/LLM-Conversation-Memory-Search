@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "../../../../.."
+		}
+	],
+	"settings": {
+		"cSpell.words": [
+			"llmmemory",
+			"pageable",
+			"plainto",
+			"projectlombok",
+			"springframework",
+			"tsquery",
+			"tsvector"
+		],
+		"java.configuration.updateBuildConfiguration": "interactive"
+	}
+}
