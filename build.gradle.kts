@@ -30,10 +30,11 @@ dependencies {
 	implementation("org.jsoup:jsoup:1.17.2")
 
 	// Phase 2: LangChain4j — BOM pins all module versions in sync
+	// Note: langchain4j-redis is a community module outside the BOM (needs explicit version) — pgvector used instead
 	implementation(platform("dev.langchain4j:langchain4j-bom:1.14.1"))
 	implementation("dev.langchain4j:langchain4j")
 	implementation("dev.langchain4j:langchain4j-open-ai")
-	implementation("dev.langchain4j:langchain4j-redis")
+	implementation("dev.langchain4j:langchain4j-pgvector")
 }
 
 tasks.withType<Test> {

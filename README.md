@@ -17,7 +17,7 @@ Each technology was chosen for a specific reason:
 | Technology | Why |
 |---|---|
 | **LangChain4j** | Orchestrates the multi-step ingestion pipeline (fetch → chunk → summarize → embed → store). Abstracts the model layer so the underlying LLM is swappable with no changes to business logic. |
-| **Redis Stack** | Provides native vector similarity search via RediSearch. Also used as a cache to avoid re-processing conversations. |
+| **pgvector** | PostgreSQL extension that adds a `vector` column type and KNN similarity search. Chosen over Redis Stack because `langchain4j-redis` was dropped in LangChain4j 1.x. Postgres is already running — no new infrastructure needed. |
 | **OpenAI / Ollama** | Summarization model + embedding model. Interchangeable via LangChain4j's model abstraction. |
 | **Spring Boot** | REST API layer. |
 | **Docker** | Packages the app and Redis as a single runnable unit. |
@@ -76,7 +76,7 @@ The project is built **incrementally**. Each phase produces something that works
 > **Goal:** Wire a real pipeline into the existing POST endpoint. Introduce LangChain4j and Redis.
 
 - LangChain4j orchestrates: chunk → summarize → embed
-- Redis Vector Store stores embeddings
+- pgvector (Postgres extension) stores embeddings alongside relational data
 - Semantic search replaces keyword search
 - No new input source — raw text paste from Phase 1 feeds the pipeline
 
@@ -139,7 +139,7 @@ Language:        Java 21
 Framework:       Spring Boot 3.x
 AI Orchestration: LangChain4j
 Database (MVP):  PostgreSQL
-Database (Phase 2+): Redis Stack (with Vector Search)
+Vector Search (Phase 2+): pgvector (Postgres extension)
 Models:          OpenAI gpt-4o-mini (summarization)
                  OpenAI text-embedding-3-small (embeddings)
                  → Swappable to Ollama in Phase 2

@@ -70,35 +70,25 @@ EmbeddingModel embeddingModel = OllamaEmbeddingModel.builder()
 
 ---
 
-## Redis Vector Store
+## Vector Store (pgvector)
 
-Redis Stack (RediSearch + RedisJSON) provides native vector similarity search. LangChain4j has a first-class integration — no manual index management needed.
+The original spec called for Redis Stack (RediSearch + RedisJSON) as the vector store. In LangChain4j 1.x, Redis moved to a community module (`langchain4j-redis`) versioned independently from the BOM — it is not listed in the BOM and must be added with an explicit version. pgvector was chosen instead because Postgres is already running and `langchain4j-pgvector` is fully supported by the BOM, requiring no new infrastructure or explicit version pinning.
 
-Run locally:
-```bash
-docker run -d --name redis-stack \
-  -p 6379:6379 \
-  -p 8001:8001 \
-  redis/redis-stack:latest
+pgvector is a PostgreSQL extension that adds a `vector` column type and KNN similarity search. LangChain4j has first-class support via `langchain4j-pgvector`. Since Postgres is already running, no new infrastructure is needed.
+
+Each chunk is stored as a row in a `vector_store` table managed by LangChain4j:
+
+| Column | Type | Description |
+|---|---|---|
+| `embedding_id` | uuid | Primary key |
+| `embedding` | vector(1536) | The float vector — 1536 dims for `text-embedding-3-small` |
+| `content` | text | The raw chunk text |
+| `metadata` | json | conversation_id, title, chunk_index, summary |
+
+The pgvector extension must be enabled in Postgres before the app starts:
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
 ```
-
-Port 8001 is RedisInsight — a web UI for inspecting stored documents and embeddings.
-
-Each chunk is stored as a Redis document:
-
-```json
-{
-  "chunk_id": "uuid",
-  "conversation_id": "uuid",
-  "conversation_title": "My Spring Boot conversation",
-  "chunk_content": "The raw chunk text",
-  "summary": "A summary of this chunk",
-  "embedding": [0.123, -0.456, ...],
-  "created_at": "2025-04-27T10:00:00Z"
-}
-```
-
-`embedding` is 1536 dimensions for `text-embedding-3-small`.
 
 ---
 
@@ -143,10 +133,11 @@ src/main/java/com/llmmemory/
 
 ```kotlin
 // LangChain4j — BOM pins all module versions in sync
+// Note: langchain4j-redis is a community module outside the BOM — pgvector used instead
 implementation(platform("dev.langchain4j:langchain4j-bom:1.14.1"))
 implementation("dev.langchain4j:langchain4j")
 implementation("dev.langchain4j:langchain4j-open-ai")
-implementation("dev.langchain4j:langchain4j-redis")
+implementation("dev.langchain4j:langchain4j-pgvector")
 ```
 
 ---
@@ -163,6 +154,7 @@ implementation("dev.langchain4j:langchain4j-redis")
 ## What Phase 2 Does NOT Do
 
 - No new input sources — file upload and URL ingestion are Phase 5
+- No Redis — `langchain4j-redis` is a community module outside the BOM; pgvector is used instead
 - No agent decision-making (Phase 3)
 - No Docker Compose (Phase 4)
 - No Kubernetes (Phase 4)

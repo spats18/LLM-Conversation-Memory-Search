@@ -4,7 +4,7 @@
 
 ## Goal
 
-Package and deploy the full stack — Spring Boot app + Redis Stack — using Docker Compose for local development and Kubernetes (Minikube) for orchestration.
+Package and deploy the full stack — Spring Boot app + PostgreSQL (with pgvector) — using Docker Compose for local development and Kubernetes (Minikube) for orchestration.
 
 ---
 
@@ -45,31 +45,35 @@ services:
       - "8080:8080"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/llmmemory
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
-      redis:
+      postgres:
         condition: service_healthy
 
-  redis:
-    image: redis/redis-stack:latest
+  postgres:
+    image: pgvector/pgvector:pg17
     ports:
-      - "6379:6379"
-      - "8001:8001"
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=llmmemory
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - redis_data:/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  redis_data:
+  postgres_data:
 ```
 
-`depends_on` with `condition: service_healthy` prevents the app from starting before Redis is ready. `redis_data` is a named volume so Redis data persists across container restarts. `OPENAI_API_KEY` comes from the shell — no secrets in the Compose file.
+`pgvector/pgvector:pg17` is the official Postgres image with the pgvector extension pre-installed — no manual `CREATE EXTENSION` step needed in the container. `depends_on` with `condition: service_healthy` prevents the app from starting before Postgres is ready. `OPENAI_API_KEY` and `POSTGRES_PASSWORD` come from the shell — no secrets in the Compose file.
+
+> **Note:** The original spec used Redis Stack here. In LangChain4j 1.x, `langchain4j-redis` is a community module outside the BOM — pgvector was chosen for simplicity since Postgres is already in the stack. If Redis is explored separately (Phase 5+), add it back as a second service using the `redis/redis-stack:latest` image.
 
 ---
 

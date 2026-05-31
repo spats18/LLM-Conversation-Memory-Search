@@ -28,11 +28,17 @@ interface MemoryAgent {
 MemoryAgent agent = AiServices.builder(MemoryAgent.class)
     .chatLanguageModel(chatModel)
     .tools(new ConversationTools(searchService, storageService))
-    .chatMemory(MessageWindowChatMemory.withMaxMessages(10))
+    .chatMemory(MessageWindowChatMemory.builder()
+        .maxMessages(10)
+        .chatMemoryStore(RedisChatMemoryStore.builder()
+            .host("localhost")
+            .port(6379)
+            .build())
+        .build())
     .build();
 ```
 
-`chatMemory` gives the agent session context so multi-turn conversations work within a session.
+`chatMemory` gives the agent session context so multi-turn conversations work within a session. Chat history is stored in Redis rather than in-process memory — sessions survive app restarts and are shared across instances. At single-user scale this is not strictly necessary, but it demonstrates Redis in its natural role as a session state store and works correctly under Phase 4's multi-replica Kubernetes deployment.
 
 ---
 
@@ -109,7 +115,7 @@ Be concise. The user is a developer.
 }
 ```
 
-`sessionId` is client-generated. Session memory lives in-process and resets on restart. `MessageWindowChatMemory` drops oldest messages when the window fills.
+`sessionId` is client-generated. Session memory is stored in Redis and survives restarts. `MessageWindowChatMemory` drops oldest messages when the window fills.
 
 ---
 
@@ -137,10 +143,39 @@ src/main/java/com/llmmemory/
 
 ---
 
+## Redis Dependency
+
+Phase 3 introduces Redis for the first time. Run it locally alongside the existing stack:
+
+```bash
+docker run -d --name redis \
+  -p 6379:6379 \
+  redis/redis-stack:latest
+```
+
+Dependency (community module, versioned outside the BOM):
+```kotlin
+implementation("dev.langchain4j:langchain4j-redis:1.0.0-beta2")
+```
+
+---
+
+## Data Store Responsibilities
+
+| Store | Role |
+|---|---|
+| Postgres + pgvector | Conversations, chunks, embeddings — permanent data |
+| Redis | Agent session chat history — session-scoped state |
+
+Two stores, two genuinely separate jobs. pgvector owns the knowledge base; Redis owns the live conversation context.
+
+---
+
 ## Phase 3 Done When...
 
 - [ ] POST /api/v1/agent/chat responds using tools from indexed memory
 - [ ] Multi-turn conversation works within a session
+- [ ] Session history persists in Redis across app restarts
 - [ ] The system prompt prevents the agent from answering outside its indexed data
 - [ ] The agent correctly chains tool calls (e.g. search → get detail)
 
