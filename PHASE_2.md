@@ -1,63 +1,30 @@
-# Phase 2 — Real Ingestion: File Upload + LangChain4j + Redis
+# Phase 2 — Real Ingestion: LangChain4j + Redis
 
 > **Status: 🔲 Not started.**
 
 ## Goal
 
-Phase 2 replaces the manual pieces from Phase 1 with a proper ingestion pipeline:
-- One input source: exported Claude JSON file upload
-- LangChain4j for chunking, summarization, and embedding
-- Redis Stack as the vector store
-- Semantic search replacing keyword search
+Phase 2 wires a LangChain4j pipeline and Redis vector store into the existing POST endpoint from Phase 1. No new input source is added — the same raw text paste already works. The value is what happens after the text arrives: proper chunking, per-chunk summarization, embedding, and semantic search.
 
 Phase 1 used a direct `RestTemplate` call and Postgres `tsvector` search on purpose — the verbosity and keyword gaps make the Phase 2 abstractions concrete rather than theoretical.
 
 ---
 
-## Input Source
+## What Changes
 
-`ParsedConversation` is the internal format the pipeline consumes. Phase 2 MVP supports one source: exported Claude JSON file upload.
+The existing `POST /api/v1/conversations` endpoint gets extended: after storing the conversation (Phase 1 behaviour), the pipeline runs — chunks the raw content, summarizes each chunk, embeds it, and stores the result in Redis.
 
-```java
-public class ParsedConversation {
-    private String title;
-    private String sourceType;      // "file" (url added post-MVP)
-    private List<ConversationTurn> turns;
-}
-
-public class ConversationTurn {
-    private String role;            // "user" or "assistant"
-    private String content;
-}
-```
-
-### Exported Claude JSON
-
-`POST /api/v1/conversations/ingest-file` accepts a multipart upload of an exported Claude JSON file. Jackson (already on the classpath) deserializes it. Expected structure:
-
-```json
-{
-  "title": "Conversation about Spring Boot",
-  "created_at": "2025-04-01T10:00:00Z",
-  "messages": [
-    { "role": "user", "content": "How do I set up Spring Boot?" },
-    { "role": "assistant", "content": "First, go to start.spring.io..." }
-  ]
-}
-```
+`GET /api/v1/conversations/search` switches from Postgres `tsvector` to a Redis KNN semantic search.
 
 ---
 
 ## Ingestion Pipeline
 
 ```
-ParsedConversation
+rawContent (from existing POST endpoint)
        │
        ▼
-  DocumentLoader         ← Convert ParsedConversation → LangChain4j Document
-       │
-       ▼
-  TextSplitter           ← 500-token chunks, 50-token overlap
+  ChunkingService        ← LangChain4j DocumentSplitter, 500-token chunks, 50-token overlap
        │
        ▼
   SummarizationService   ← Per-chunk LLM summarization (ChatLanguageModel)
@@ -124,7 +91,6 @@ Each chunk is stored as a Redis document:
   "chunk_id": "uuid",
   "conversation_id": "uuid",
   "conversation_title": "My Spring Boot conversation",
-
   "chunk_content": "The raw chunk text",
   "summary": "A summary of this chunk",
   "embedding": [0.123, -0.456, ...],
@@ -144,11 +110,11 @@ Each chunk is stored as a Redis document:
 
 ## API Endpoints
 
-### POST /api/v1/conversations/ingest-file
-Multipart form upload of the exported JSON file.
+### POST /api/v1/conversations
+Unchanged from Phase 1 — raw text paste. Now also triggers the LangChain4j pipeline after storing.
 
 ### GET /api/v1/conversations/search?q=your+query
-Semantic search. Returns ranked results with relevance scores.
+Semantic search via Redis KNN. Returns ranked results with relevance scores.
 
 ### GET /api/v1/conversations
 Unchanged from Phase 1.
@@ -159,12 +125,6 @@ Unchanged from Phase 1.
 
 ```
 src/main/java/com/llmmemory/
-├── ingestion/
-│   ├── IngestionService.java          ← Orchestrates the full pipeline
-│   ├── FileParserService.java         ← Jackson parse of exported JSON
-│   ├── ParsedConversation.java        ← Internal format
-│   └── ConversationTurn.java
-│
 ├── pipeline/
 │   ├── ChunkingService.java           ← LangChain4j DocumentSplitter wrapper
 │   ├── SummarizationService.java      ← LangChain4j ChatLanguageModel wrapper
@@ -182,9 +142,6 @@ src/main/java/com/llmmemory/
 ## Dependencies (build.gradle.kts)
 
 ```kotlin
-// HTML parsing
-implementation("org.jsoup:jsoup:1.17.2")
-
 // LangChain4j — BOM pins all module versions in sync
 implementation(platform("dev.langchain4j:langchain4j-bom:1.14.1"))
 implementation("dev.langchain4j:langchain4j")
@@ -196,7 +153,7 @@ implementation("dev.langchain4j:langchain4j-redis")
 
 ## Phase 2 Done When...
 
-- [ ] POST an exported JSON file → conversation parsed, chunked, summarized, embedded, stored in Redis
+- [ ] POST raw text → conversation chunked, summarized, embedded, stored in Redis
 - [ ] Semantic search returns results that keyword search would miss
 - [ ] Swapping OpenAI for Ollama requires only a config change
 - [ ] RedisInsight shows stored embeddings correctly
@@ -205,7 +162,7 @@ implementation("dev.langchain4j:langchain4j-redis")
 
 ## What Phase 2 Does NOT Do
 
-- No Claude share URL ingestion (see EXTENSIONS.md)
+- No new input sources — file upload and URL ingestion are Phase 5
 - No agent decision-making (Phase 3)
 - No Docker Compose (Phase 4)
 - No Kubernetes (Phase 4)
