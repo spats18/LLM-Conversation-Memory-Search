@@ -1,4 +1,4 @@
-# Phase 2 — Real Ingestion: LangChain4j + Redis
+# Phase 2 — LangChain4j Pipeline + Semantic Search
 
 > **Status: 🔲 Not started.**
 

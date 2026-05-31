@@ -4,7 +4,7 @@
 
 A personal tool that lets you **index, summarize, and semantically search your LLM conversations**.
 
-You paste a Claude share link or upload a conversation export, the app ingests it, generates a summary, stores it with embeddings, and later lets you search across all your indexed conversations using natural language — not just keywords.
+You paste raw conversation text, the app chunks it, summarizes each chunk, stores embeddings in Redis, and lets you search across all indexed conversations using natural language — not just keywords.
 
 This is a **RAG (Retrieval-Augmented Generation)** pipeline, which is the most in-demand agentic pattern in the industry right now.
 
@@ -72,14 +72,13 @@ The project is built **incrementally**. Each phase produces something that works
 
 ---
 
-### Phase 2 — Real Ingestion: URL Fetch + File Upload + LangChain4j + Redis
-> **Goal:** Replace the manual pieces with a real pipeline. Introduce LangChain4j and Redis.
+### Phase 2 — LangChain4j Pipeline + Semantic Search
+> **Goal:** Wire a real pipeline into the existing POST endpoint. Introduce LangChain4j and Redis.
 
-- Fetch Claude share URL (scrape conversation from public link)
-- Upload exported Claude JSON file
 - LangChain4j orchestrates: chunk → summarize → embed
-- Redis Vector Store replaces PostgreSQL
+- Redis Vector Store stores embeddings
 - Semantic search replaces keyword search
+- No new input source — raw text paste from Phase 1 feeds the pipeline
 
 👉 See [PHASE_2.md](./PHASE_2.md)
 
@@ -110,6 +109,16 @@ The project is built **incrementally**. Each phase produces something that works
 
 ---
 
+### Phase 5 — Additional Input Sources
+> **Goal:** Add structured ingestion on top of the existing pipeline. Post-MVP.
+
+- Exported Claude JSON file upload
+- Claude share URL fetch (Jsoup HTML scraping)
+
+👉 See [PHASE_5.md](./PHASE_5.md)
+
+---
+
 ## Build Approach
 
 Each phase produces a working, demonstrable system. No phase breaks what the previous one built.
@@ -119,6 +128,7 @@ Rough timeline:
 - Phase 2: ~2 weeks
 - Phase 3: ~1 week
 - Phase 4: ~a few days
+- Phase 5: ~1 week (post-MVP, time permitting)
 
 ---
 
@@ -149,13 +159,17 @@ llm-memory-search/
 ├── PHASE_2.md
 ├── PHASE_3.md
 ├── PHASE_4.md
+├── PHASE_5.md
 ├── src/
 │   └── main/java/
-│       └── com/yourname/llmmemory/
-│           ├── ingestion/       ← Fetch, parse, chunk, summarize, embed
-│           ├── search/          ← Search API
-│           ├── agent/           ← Phase 3: Agentic layer
-│           └── api/             ← REST controllers
+│       └── com/llmmemory/
+│           ├── conversation/    ← Entities, repos, service, controller (Phase 1)
+│           ├── summarization/   ← Direct OpenAI call (Phase 1)
+│           ├── pipeline/        ← LangChain4j chunk/embed/summarize (Phase 2)
+│           ├── storage/         ← Redis vector store (Phase 2)
+│           ├── search/          ← Semantic search (Phase 2)
+│           ├── agent/           ← Agent + tools (Phase 3)
+│           └── ingestion/       ← File/URL parse (Phase 5)
 ├── docker-compose.yml           ← Phase 4
 ├── Dockerfile                   ← Phase 4
 └── k8s/                         ← Phase 4

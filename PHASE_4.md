@@ -77,7 +77,7 @@ volumes:
 
 ### Why Separate Deployments
 
-Ingestion (URL fetch, chunking, OpenAI calls) is CPU/memory intensive and bursty. Search (embed query + Redis KNN) is lightweight and high-frequency. Separating them into distinct Deployments lets each scale independently:
+Ingestion (chunking, OpenAI calls, embedding) is CPU/memory intensive and bursty. Search (embed query + Redis KNN) is lightweight and high-frequency. Separating them into distinct Deployments lets each scale independently:
 
 ```bash
 kubectl scale deployment llm-memory-ingestion --replicas=5
