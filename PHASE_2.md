@@ -14,15 +14,14 @@ Phase 1 used a direct `RestTemplate` call and Postgres `tsvector` search on purp
 
 ---
 
-## Input Sources
+## Input Source
 
-Both sources produce the same internal `ParsedConversation`. The ingestion pipeline is source-agnostic.
+`ParsedConversation` is the internal format the pipeline consumes. Phase 2 MVP supports one source: exported Claude JSON file upload.
 
 ```java
 public class ParsedConversation {
     private String title;
-    private String sourceUrl;       // null if from file
-    private String sourceType;      // "url" or "file"
+    private String sourceType;      // "file" (url added post-MVP)
     private List<ConversationTurn> turns;
 }
 
@@ -32,13 +31,7 @@ public class ConversationTurn {
 }
 ```
 
-### Source 1: Claude Share URL
-
-`POST /api/v1/conversations/ingest-url` accepts a Claude share URL (e.g. `https://claude.ai/share/some-id`). `UrlFetcherService` issues an HTTP GET via Jsoup, parses the HTML to extract the title and conversation turns, and hands a `ParsedConversation` to the ingestion pipeline.
-
-The HTML parser is intentionally fragile — Claude's share page structure can change without notice. This is documented in the code as a known tradeoff, not a bug.
-
-### Source 2: Exported Claude JSON
+### Exported Claude JSON
 
 `POST /api/v1/conversations/ingest-file` accepts a multipart upload of an exported Claude JSON file. Jackson (already on the classpath) deserializes it. Expected structure:
 
@@ -151,11 +144,6 @@ Each chunk is stored as a Redis document:
 
 ## API Endpoints
 
-### POST /api/v1/conversations/ingest-url
-```json
-{ "url": "https://claude.ai/share/abc123" }
-```
-
 ### POST /api/v1/conversations/ingest-file
 Multipart form upload of the exported JSON file.
 
@@ -173,9 +161,8 @@ Unchanged from Phase 1.
 src/main/java/com/llmmemory/
 ├── ingestion/
 │   ├── IngestionService.java          ← Orchestrates the full pipeline
-│   ├── UrlFetcherService.java         ← Jsoup fetch + HTML parse
 │   ├── FileParserService.java         ← Jackson parse of exported JSON
-│   ├── ParsedConversation.java        ← Common internal format
+│   ├── ParsedConversation.java        ← Internal format
 │   └── ConversationTurn.java
 │
 ├── pipeline/
@@ -209,8 +196,7 @@ implementation("dev.langchain4j:langchain4j-redis")
 
 ## Phase 2 Done When...
 
-- [ ] POST a Claude share URL → conversation fetched, parsed, chunked, summarized, embedded, stored in Redis
-- [ ] POST an exported JSON file → same pipeline, different source
+- [ ] POST an exported JSON file → conversation parsed, chunked, summarized, embedded, stored in Redis
 - [ ] Semantic search returns results that keyword search would miss
 - [ ] Swapping OpenAI for Ollama requires only a config change
 - [ ] RedisInsight shows stored embeddings correctly
@@ -219,6 +205,7 @@ implementation("dev.langchain4j:langchain4j-redis")
 
 ## What Phase 2 Does NOT Do
 
+- No Claude share URL ingestion (see EXTENSIONS.md)
 - No agent decision-making (Phase 3)
 - No Docker Compose (Phase 4)
 - No Kubernetes (Phase 4)
