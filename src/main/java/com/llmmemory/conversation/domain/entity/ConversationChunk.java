@@ -28,5 +28,11 @@ public class ConversationChunk {
   private String content;
 
   // Set automatically by Hibernate when the chunk is saved
-  @CreationTimestamp private LocalDateTime createdAt;
+  @CreationTimestamp
+  private LocalDateTime createdAt;
+
+  // Embeddings for this chunk are NOT stored here — they live in the
+  // PgVectorEmbeddingStore
+  // (pipeline/EmbeddingService.java), linked back via chunk id stored in
+  // metadata.
 }
