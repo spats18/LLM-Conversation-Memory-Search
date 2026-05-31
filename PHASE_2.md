@@ -1,11 +1,11 @@
-# Phase 2 — Real Ingestion: URL Fetch + File Upload + LangChain4j + Redis
+# Phase 2 — Real Ingestion: File Upload + LangChain4j + Redis
 
 > **Status: 🔲 Not started.**
 
 ## Goal
 
 Phase 2 replaces the manual pieces from Phase 1 with a proper ingestion pipeline:
-- Two input sources: Claude share URL and exported JSON file
+- One input source: exported Claude JSON file upload
 - LangChain4j for chunking, summarization, and embedding
 - Redis Stack as the vector store
 - Semantic search replacing keyword search
@@ -124,7 +124,7 @@ Each chunk is stored as a Redis document:
   "chunk_id": "uuid",
   "conversation_id": "uuid",
   "conversation_title": "My Spring Boot conversation",
-  "source_url": "https://claude.ai/share/...",
+
   "chunk_content": "The raw chunk text",
   "summary": "A summary of this chunk",
   "embedding": [0.123, -0.456, ...],
