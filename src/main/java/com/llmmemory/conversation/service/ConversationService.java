@@ -1,6 +1,7 @@
 package com.llmmemory.conversation.service;
 
-import java.util.*;
+import java.util.UUID;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 
@@ -9,10 +10,11 @@ import com.llmmemory.conversation.domain.entity.ConversationChunk;
 import com.llmmemory.conversation.repository.ConversationChunkRepository;
 import com.llmmemory.conversation.repository.ConversationRepository;
 import com.llmmemory.pipeline.ChunkingService;
+import com.llmmemory.pipeline.SummarizationService;
+import com.llmmemory.pipeline.exception.SummarizationException;
 import com.llmmemory.shared.exception.ConversationNotFoundException;
 import com.llmmemory.shared.exception.DuplicateTitleException;
-import com.llmmemory.summarization.exception.SummarizationException;
-import com.llmmemory.summarization.service.SummarizationService;
+
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
