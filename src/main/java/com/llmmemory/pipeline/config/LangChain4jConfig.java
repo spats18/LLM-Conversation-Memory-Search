@@ -1,6 +1,6 @@
 package com.llmmemory.pipeline.config;
 
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
@@ -26,7 +26,7 @@ public class LangChain4jConfig {
 
     // Used by SummarizationService to generate per-chunk summaries
     @Bean
-    public ChatLanguageModel chatLanguageModel() {
+    public ChatModel chatLanguageModel() {
         return OpenAiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(chatModelName)
