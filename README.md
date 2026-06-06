@@ -4,7 +4,7 @@
 
 A personal tool that lets you **index, summarize, and semantically search your LLM conversations**.
 
-You paste raw conversation text, the app chunks it, summarizes each chunk, stores embeddings in Redis, and lets you search across all indexed conversations using natural language — not just keywords.
+You paste raw conversation text, the app summarizes it, chunks it, stores embeddings in pgvector, and lets you search across all indexed conversations using natural language — not just keywords.
 
 This is a **RAG (Retrieval-Augmented Generation)** pipeline, which is the most in-demand agentic pattern in the industry right now.
 
@@ -38,10 +38,10 @@ Each technology was chosen for a specific reason:
 │              INGESTION PIPELINE (LangChain4j)        │
 │                                                      │
 │  1. Fetch / Parse conversation                       │
-│  2. Chunk into segments                              │
-│  3. Summarize each chunk  ──► LLM (OpenAI/Ollama)   │
+│  2. Summarize conversation  ──► LLM (OpenAI/Ollama) │
+│  3. Chunk into segments                              │
 │  4. Generate embeddings   ──► Embedding Model        │
-│  5. Store in Redis Vector Store                      │
+│  5. Store in pgvector (chunk_embeddings table)       │
 └──────────────────────────┬──────────────────────────┘
                            │
                            ▼
@@ -72,12 +72,14 @@ The project is built **incrementally**. Each phase produces something that works
 
 ---
 
-### Phase 2 — LangChain4j Pipeline + Semantic Search
-> **Goal:** Wire a real pipeline into the existing POST endpoint. Introduce LangChain4j and Redis.
+### Phase 2 — LangChain4j Pipeline + Semantic Search ✅ Complete
+> **Goal:** Wire a real pipeline into the existing POST endpoint. Introduce LangChain4j and pgvector.
 
-- LangChain4j orchestrates: chunk → summarize → embed
-- pgvector (Postgres extension) stores embeddings alongside relational data
-- Semantic search replaces keyword search
+- LangChain4j orchestrates: summarize → chunk → embed
+- pgvector (Postgres extension) stores chunk embeddings with conversationId metadata
+- `GET /api/v1/conversations/search` — semantic search, returns summaries ranked by similarity
+- `GET /api/v1/conversations/search/keyword` — keyword search preserved at new path
+- Two-step retrieval: search returns summaries, full conversation fetched on demand by ID
 - No new input source — raw text paste from Phase 1 feeds the pipeline
 
 👉 See [PHASE_2.md](./PHASE_2.md)
@@ -163,11 +165,13 @@ llm-memory-search/
 ├── src/
 │   └── main/java/
 │       └── com/llmmemory/
-│           ├── conversation/    ← Entities, repos, service, controller (Phase 1)
-│           ├── summarization/   ← Direct OpenAI call (Phase 1)
-│           ├── pipeline/        ← LangChain4j chunk/embed/summarize (Phase 2)
-│           ├── storage/         ← Redis vector store (Phase 2)
-│           ├── search/          ← Semantic search (Phase 2)
+│           ├── conversation/    ← Entities, repos, service, controller
+│           ├── processing/      ← ChunkingService, SummarizationService, EmbeddingService
+│           │   ├── config/      ← LangChain4jConfig (ChatModel, EmbeddingModel, PgVectorEmbeddingStore)
+│           │   ├── exception/   ← SummarizationException
+│           │   └── service/
+│           ├── search/          ← SearchService (semantic KNN search)
+│           ├── shared/          ← GlobalExceptionHandler, domain exceptions
 │           ├── agent/           ← Agent + tools (Phase 3)
 │           └── ingestion/       ← File/URL parse (Phase 5)
 ├── docker-compose.yml           ← Phase 4
