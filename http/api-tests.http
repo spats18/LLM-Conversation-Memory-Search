@@ -51,17 +51,24 @@ Content-Type: application/json
   "rawContent": "Different content but same title — should be rejected as duplicate."
 }
 
-### Search - keyword match across title + raw_content
-GET http://localhost:8080/api/v1/conversations/search?query=electric&page=0&size=5
+### Semantic search - should return conversations ranked by similarity, no raw content
+GET http://localhost:8080/api/v1/conversations/search?query=electric+toothbrush+plaque+removal
 
-### Search - phrase (plainto_tsquery handles tokenization)
-GET http://localhost:8080/api/v1/conversations/search?query=electric%20toothbrush&size=10
+### Semantic search - meaning match, not keyword match (no "keyboard" in query but should surface laptop keyboard conversation)
+GET http://localhost:8080/api/v1/conversations/search?query=how+to+clean+electronic+device
 
-### Search - no results expected
+### Semantic search - low relevance query; may still return results at min-score=0.5 because
+### the model always produces a vector — raise min-score to 0.75+ to filter these out
 GET http://localhost:8080/api/v1/conversations/search?query=quantumcryptography
 
-### Search - missing query param should return 400
+### Semantic search - missing query param should return 400
 GET http://localhost:8080/api/v1/conversations/search
+
+### Keyword search (preserved at new path) - exact token match
+GET http://localhost:8080/api/v1/conversations/search/keyword?query=electric&page=0&size=5
+
+### Keyword search - phrase match
+GET http://localhost:8080/api/v1/conversations/search/keyword?query=electric%20toothbrush&size=10
 
 ### Validation FAILURE - missing title - should be 400 Bad Request
 POST http://localhost:8080/api/v1/conversations
