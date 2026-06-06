@@ -9,9 +9,9 @@ import com.llmmemory.conversation.domain.entity.Conversation;
 import com.llmmemory.conversation.domain.entity.ConversationChunk;
 import com.llmmemory.conversation.repository.ConversationChunkRepository;
 import com.llmmemory.conversation.repository.ConversationRepository;
-import com.llmmemory.pipeline.ChunkingService;
-import com.llmmemory.pipeline.SummarizationService;
-import com.llmmemory.pipeline.exception.SummarizationException;
+import com.llmmemory.processing.service.ChunkingService;
+import com.llmmemory.processing.service.SummarizationService;
+import com.llmmemory.processing.exception.SummarizationException;
 import com.llmmemory.shared.exception.ConversationNotFoundException;
 import com.llmmemory.shared.exception.DuplicateTitleException;
 

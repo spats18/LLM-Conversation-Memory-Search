@@ -1,4 +1,4 @@
-package com.llmmemory.pipeline.exception;
+package com.llmmemory.processing.exception;
 
 public class SummarizationException extends Exception {
   public SummarizationException(String message) {

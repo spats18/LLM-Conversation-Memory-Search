@@ -33,6 +33,6 @@ public class ConversationChunk {
 
   // Embeddings for this chunk are NOT stored here — they live in the
   // PgVectorEmbeddingStore
-  // (pipeline/EmbeddingService.java), linked back via chunk id stored in
+  // (processing/EmbeddingService.java), linked back via chunk id stored in
   // metadata.
 }

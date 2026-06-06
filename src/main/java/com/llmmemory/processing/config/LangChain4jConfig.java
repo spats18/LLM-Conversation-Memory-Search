@@ -1,4 +1,4 @@
-package com.llmmemory.pipeline.config;
+package com.llmmemory.processing.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

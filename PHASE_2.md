@@ -4,7 +4,7 @@
 
 ## Goal
 
-Phase 2 wires a LangChain4j pipeline and Redis vector store into the existing POST endpoint from Phase 1. No new input source is added — the same raw text paste already works. The value is what happens after the text arrives: proper chunking, per-chunk summarization, embedding, and semantic search.
+Phase 2 wires a LangChain4j pipeline and pgvector store into the existing POST endpoint from Phase 1. No new input source is added — the same raw text paste already works. The value is what happens after the text arrives: proper chunking, per-chunk summarization, embedding, and semantic search.
 
 Phase 1 used a direct `RestTemplate` call and Postgres `tsvector` search on purpose — the verbosity and keyword gaps make the Phase 2 abstractions concrete rather than theoretical.
 
@@ -12,7 +12,7 @@ Phase 1 used a direct `RestTemplate` call and Postgres `tsvector` search on purp
 
 ## What Changes
 
-The existing `POST /api/v1/conversations` endpoint gets extended: after storing the conversation (Phase 1 behaviour), the pipeline runs — chunks the raw content, summarizes each chunk, embeds it, and stores the result in Redis.
+The existing `POST /api/v1/conversations` endpoint gets extended: after storing the conversation (Phase 1 behaviour), the processing pipeline runs — chunks the raw content, summarizes the conversation, embeds the chunks, and stores the result in pgvector.
 
 `GET /api/v1/conversations/search` switches from Postgres `tsvector` to a Redis KNN semantic search.
 
@@ -94,17 +94,27 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ## Semantic Search
 
-`GET /api/v1/conversations/search?q=...` in Phase 2 embeds the query and runs a KNN similarity search in Redis, replacing the Phase 1 Postgres `tsvector` approach. A query like "neural network optimization" surfaces a chunk about "machine learning model training" — semantic match, not token match.
+`GET /api/v1/conversations/search?q=...` in Phase 2 embeds the query and runs a KNN similarity search in pgvector, replacing the Phase 1 Postgres `tsvector` approach. A query like "neural network optimization" surfaces a chunk about "machine learning model training" — semantic match, not token match.
+
+Search uses a **two-step retrieval flow**:
+
+1. **Search** — `GET /api/v1/conversations/search?q=...` embeds the query, runs KNN against the chunk embeddings, walks up to the parent conversation via `conversation_id` in metadata, deduplicates, and returns a list of `ConversationResponse` objects (id, title, summary, createdAt). Raw content is never returned here.
+2. **Full fetch** — if the user wants the full conversation, they call `GET /api/v1/conversations/{id}`. That endpoint already exists from Phase 1.
+
+`ConversationResponse` already excludes `rawContent`, so no new DTO is needed for search results.
 
 ---
 
 ## API Endpoints
 
 ### POST /api/v1/conversations
-Unchanged from Phase 1 — raw text paste. Now also triggers the LangChain4j pipeline after storing.
+Unchanged from Phase 1 — raw text paste. Now also triggers the LangChain4j processing after storing.
 
 ### GET /api/v1/conversations/search?q=your+query
-Semantic search via Redis KNN. Returns ranked results with relevance scores.
+Semantic search via pgvector KNN. Returns `List<ConversationResponse>` — id, title, summary, createdAt. No raw content.
+
+### GET /api/v1/conversations/{id}
+Unchanged from Phase 1. Returns the full conversation including `rawContent`. Called when the user selects a result from the search list.
 
 ### GET /api/v1/conversations
 Unchanged from Phase 1.
@@ -115,16 +125,19 @@ Unchanged from Phase 1.
 
 ```
 src/main/java/com/llmmemory/
-├── pipeline/
-│   ├── ChunkingService.java           ← LangChain4j DocumentSplitter wrapper
-│   ├── SummarizationService.java      ← LangChain4j ChatLanguageModel wrapper
-│   └── EmbeddingService.java          ← LangChain4j EmbeddingModel wrapper
-│
-├── storage/
-│   └── RedisVectorStoreService.java   ← Store and retrieve from Redis
+├── processing/
+│   ├── config/
+│   │   └── LangChain4jConfig.java     ← ChatModel, EmbeddingModel, PgVectorEmbeddingStore beans
+│   ├── exception/
+│   │   └── SummarizationException.java
+│   └── service/
+│       ├── ChunkingService.java       ← LangChain4j DocumentSplitter wrapper
+│       ├── SummarizationService.java  ← LangChain4j ChatModel wrapper
+│       └── EmbeddingService.java      ← LangChain4j EmbeddingModel wrapper
 │
 └── search/
-    └── SearchService.java             ← Embed query, KNN search, return ranked chunks
+    └── service/
+        └── SearchService.java         ← Embed query, KNN search, return ranked conversations
 ```
 
 ---
@@ -144,10 +157,10 @@ implementation("dev.langchain4j:langchain4j-pgvector")
 
 ## Phase 2 Done When...
 
-- [ ] POST raw text → conversation chunked, summarized, embedded, stored in Redis
+- [ ] POST raw text → conversation chunked, summarized, embedded, stored in pgvector
 - [ ] Semantic search returns results that keyword search would miss
+- [ ] Search returns summaries only; full conversation fetched separately by ID
 - [ ] Swapping OpenAI for Ollama requires only a config change
-- [ ] RedisInsight shows stored embeddings correctly
 
 ---
 

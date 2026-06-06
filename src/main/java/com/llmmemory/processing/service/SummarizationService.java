@@ -1,8 +1,8 @@
-package com.llmmemory.pipeline;
+package com.llmmemory.processing.service;
 
 import org.springframework.stereotype.Service;
 
-import com.llmmemory.pipeline.exception.SummarizationException;
+import com.llmmemory.processing.exception.SummarizationException;
 
 import dev.langchain4j.model.chat.ChatModel;
 import lombok.extern.slf4j.Slf4j;

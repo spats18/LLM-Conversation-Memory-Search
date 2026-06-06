@@ -1,4 +1,4 @@
-package com.llmmemory.pipeline;
+package com.llmmemory.processing.service;
 
 import java.util.List;
 
