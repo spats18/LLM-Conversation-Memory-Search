@@ -1,6 +1,7 @@
 package com.llmmemory.conversation.controller;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -67,7 +68,13 @@ public class ConversationController {
         }
 
         @GetMapping("/conversations/search")
-        public PagedResponse<ConversationResponse> searchConversations(
+        public List<ConversationResponse> searchConversations(@RequestParam String query) {
+                List<Conversation> results = conversationService.searchConversations(query);
+                return results.stream().map(ConversationResponse::from).toList();
+        }
+
+        @GetMapping("/conversations/search/keyword")
+        public PagedResponse<ConversationResponse> searchConversationsByKeyword(
                         @RequestParam String query, Pageable pageable) {
                 Page<ConversationResponse> page = conversationRepository.searchByKeyword(query, pageable)
                                 .map(ConversationResponse::from);

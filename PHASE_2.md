@@ -1,6 +1,6 @@
 # Phase 2 — LangChain4j Pipeline + Semantic Search
 
-> **Status: 🔲 Not started.**
+> **Status: ✅ Complete.**
 
 ## Goal
 
@@ -14,7 +14,7 @@ Phase 1 used a direct `RestTemplate` call and Postgres `tsvector` search on purp
 
 The existing `POST /api/v1/conversations` endpoint gets extended: after storing the conversation (Phase 1 behaviour), the processing pipeline runs — chunks the raw content, summarizes the conversation, embeds the chunks, and stores the result in pgvector.
 
-`GET /api/v1/conversations/search` switches from Postgres `tsvector` to a Redis KNN semantic search.
+`GET /api/v1/conversations/search` switches from Postgres `tsvector` to pgvector KNN semantic search. The keyword search endpoint is preserved at `GET /api/v1/conversations/search/keyword`.
 
 ---
 
@@ -24,16 +24,16 @@ The existing `POST /api/v1/conversations` endpoint gets extended: after storing 
 rawContent (from existing POST endpoint)
        │
        ▼
-  ChunkingService        ← LangChain4j DocumentSplitter, 500-token chunks, 50-token overlap
+  SummarizationService   ← Summarize full conversation (ChatModel) → stored on Conversation entity
        │
        ▼
-  SummarizationService   ← Per-chunk LLM summarization (ChatLanguageModel)
+  ChunkingService        ← LangChain4j DocumentSplitter, 500-char chunks, 50-char overlap
        │
        ▼
-  EmbeddingService       ← Per-chunk embedding (EmbeddingModel)
+  EmbeddingService       ← embedAll(chunks) via EmbeddingModel, store in pgvector with metadata
        │
        ▼
-  RedisVectorStore       ← Store chunk, summary, embedding, metadata
+  PgVectorEmbeddingStore ← chunk_embeddings table, conversationId + chunkId in metadata JSON
 ```
 
 Chunk overlap is 50 tokens so nothing is lost at split boundaries — each chunk shares a tail with its successor.
@@ -76,14 +76,14 @@ The original spec called for Redis Stack (RediSearch + RedisJSON) as the vector 
 
 pgvector is a PostgreSQL extension that adds a `vector` column type and KNN similarity search. LangChain4j has first-class support via `langchain4j-pgvector`. Since Postgres is already running, no new infrastructure is needed.
 
-Each chunk is stored as a row in a `vector_store` table managed by LangChain4j:
+Each chunk is stored as a row in the `chunk_embeddings` table managed by LangChain4j:
 
 | Column | Type | Description |
 |---|---|---|
-| `embedding_id` | uuid | Primary key |
+| `embedding_id` | uuid | Primary key (LangChain4j generated) |
 | `embedding` | vector(1536) | The float vector — 1536 dims for `text-embedding-3-small` |
 | `content` | text | The raw chunk text |
-| `metadata` | json | conversation_id, title, chunk_index, summary |
+| `metadata` | json | `conversationId` (UUID), `chunkId` (UUID), `chunkIndex` (int) |
 
 The pgvector extension must be enabled in Postgres before the app starts:
 ```sql
@@ -103,6 +103,15 @@ Search uses a **two-step retrieval flow**:
 
 `ConversationResponse` already excludes `rawContent`, so no new DTO is needed for search results.
 
+**Search tuning parameters** (configurable via `application.properties`):
+
+- `app.search.max-results` (default: 20) — raw chunk matches fetched from pgvector before
+  deduplication. Set higher than the number of conversations you want returned because multiple
+  chunks from the same conversation will all appear as separate matches.
+- `app.search.min-score` (default: 0.5) — cosine similarity threshold (0–1). 0.5 filters obvious
+  noise while avoiding silent zero-result responses. Tune upward once real conversations are
+  indexed — above 0.75 is a strong semantic match, 0.5–0.75 is loosely related.
+
 ---
 
 ## API Endpoints
@@ -111,7 +120,10 @@ Search uses a **two-step retrieval flow**:
 Unchanged from Phase 1 — raw text paste. Now also triggers the LangChain4j processing after storing.
 
 ### GET /api/v1/conversations/search?q=your+query
-Semantic search via pgvector KNN. Returns `List<ConversationResponse>` — id, title, summary, createdAt. No raw content.
+Semantic search via pgvector KNN. Returns `List<ConversationResponse>` — id, title, summary, createdAt. No raw content. Results ranked by similarity score descending.
+
+### GET /api/v1/conversations/search/keyword?q=your+query
+Keyword search preserved from Phase 1 at a new path. Returns `PagedResponse<ConversationResponse>` via tsvector + GIN index.
 
 ### GET /api/v1/conversations/{id}
 Unchanged from Phase 1. Returns the full conversation including `rawContent`. Called when the user selects a result from the search list.
@@ -157,9 +169,10 @@ implementation("dev.langchain4j:langchain4j-pgvector")
 
 ## Phase 2 Done When...
 
-- [ ] POST raw text → conversation chunked, summarized, embedded, stored in pgvector
-- [ ] Semantic search returns results that keyword search would miss
-- [ ] Search returns summaries only; full conversation fetched separately by ID
+- [x] POST raw text → conversation chunked, summarized, embedded, stored in pgvector
+- [x] Semantic search returns results that keyword search would miss
+- [x] Search returns summaries only; full conversation fetched separately by ID
+- [x] Keyword search preserved at /search/keyword; semantic search at /search
 - [ ] Swapping OpenAI for Ollama requires only a config change
 
 ---

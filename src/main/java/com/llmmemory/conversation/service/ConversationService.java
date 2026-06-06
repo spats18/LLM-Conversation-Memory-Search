@@ -13,6 +13,7 @@ import com.llmmemory.conversation.repository.ConversationRepository;
 import com.llmmemory.processing.service.ChunkingService;
 import com.llmmemory.processing.service.EmbeddingService;
 import com.llmmemory.processing.service.SummarizationService;
+import com.llmmemory.search.service.SearchService;
 import com.llmmemory.processing.exception.SummarizationException;
 import com.llmmemory.shared.exception.ConversationNotFoundException;
 import com.llmmemory.shared.exception.DuplicateTitleException;
@@ -35,18 +36,21 @@ public class ConversationService {
   private final ConversationRepository conversationRepository;
   private final ConversationChunkRepository conversationChunkRepository;
   private final EmbeddingService embeddingService;
+  private final SearchService searchService;
 
   public ConversationService(
       ChunkingService chunkingService,
       SummarizationService summarizationService,
       ConversationRepository conversationRepository,
       ConversationChunkRepository conversationChunkRepository,
-      EmbeddingService embeddingService) {
+      EmbeddingService embeddingService,
+      SearchService searchService) {
     this.chunkingService = chunkingService;
     this.summarizationService = summarizationService;
     this.conversationRepository = conversationRepository;
     this.conversationChunkRepository = conversationChunkRepository;
     this.embeddingService = embeddingService;
+    this.searchService = searchService;
   }
 
   @Transactional
@@ -92,6 +96,10 @@ public class ConversationService {
       log.error("Embedding failed for conversation {}: {}", conversation.getId(), e.getMessage(), e);
     }
     return conversation;
+  }
+
+  public List<Conversation> searchConversations(String query) {
+    return searchService.search(query);
   }
 
   // Deletes a conversation along with all its chunks. Single transaction so
