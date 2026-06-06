@@ -110,18 +110,6 @@ The project is built **incrementally**. Each phase produces something that works
 
 ---
 
-## Build Approach
-
-Each phase produces a working, demonstrable system. No phase breaks what the previous one built.
-
-Rough timeline:
-- Phase 1: ~1 week
-- Phase 2: ~2 weeks
-- Phase 3: ~a few days
-- Phase 4: ~1 week (post-MVP, time permitting)
-
----
-
 ## Tech Stack Summary
 
 ```
