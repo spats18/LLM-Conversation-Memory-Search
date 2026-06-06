@@ -1,6 +1,7 @@
 package com.llmmemory.conversation.service;
 
 import java.util.UUID;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import com.llmmemory.conversation.domain.entity.ConversationChunk;
 import com.llmmemory.conversation.repository.ConversationChunkRepository;
 import com.llmmemory.conversation.repository.ConversationRepository;
 import com.llmmemory.processing.service.ChunkingService;
+import com.llmmemory.processing.service.EmbeddingService;
 import com.llmmemory.processing.service.SummarizationService;
 import com.llmmemory.processing.exception.SummarizationException;
 import com.llmmemory.shared.exception.ConversationNotFoundException;
@@ -18,6 +20,13 @@ import com.llmmemory.shared.exception.DuplicateTitleException;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Service layer for managing conversations.
+ * Handles the orchestration of
+ * - creating a conversation,
+ * - including summarization, chunking, and embedding.
+ * - deleting conversations and their associated chunks.
+ */
 @Service
 @Slf4j
 public class ConversationService {
@@ -25,16 +34,19 @@ public class ConversationService {
   private final SummarizationService summarizationService;
   private final ConversationRepository conversationRepository;
   private final ConversationChunkRepository conversationChunkRepository;
+  private final EmbeddingService embeddingService;
 
   public ConversationService(
       ChunkingService chunkingService,
       SummarizationService summarizationService,
       ConversationRepository conversationRepository,
-      ConversationChunkRepository conversationChunkRepository) {
+      ConversationChunkRepository conversationChunkRepository,
+      EmbeddingService embeddingService) {
     this.chunkingService = chunkingService;
     this.summarizationService = summarizationService;
     this.conversationRepository = conversationRepository;
     this.conversationChunkRepository = conversationChunkRepository;
+    this.embeddingService = embeddingService;
   }
 
   @Transactional
@@ -63,6 +75,7 @@ public class ConversationService {
     conversationRepository.save(conversation);
 
     List<String> chunks = chunkingService.chunkText(rawContent);
+    List<ConversationChunk> persistedChunks = new ArrayList<>();
 
     for (int chunkIndex = 0; chunkIndex < chunks.size(); chunkIndex++) {
       ConversationChunk chunk = new ConversationChunk();
@@ -70,6 +83,13 @@ public class ConversationService {
       chunk.setChunkIndex(chunkIndex);
       chunk.setContent(chunks.get(chunkIndex));
       conversationChunkRepository.save(chunk);
+      persistedChunks.add(chunk);
+    }
+
+    try {
+      embeddingService.embedChunks(persistedChunks);
+    } catch (Exception e) {
+      log.error("Embedding failed for conversation {}: {}", conversation.getId(), e.getMessage(), e);
     }
     return conversation;
   }

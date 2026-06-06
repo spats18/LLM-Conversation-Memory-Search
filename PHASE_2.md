@@ -167,6 +167,9 @@ implementation("dev.langchain4j:langchain4j-pgvector")
 ## What Phase 2 Does NOT Do
 
 - No new input sources — file upload and URL ingestion are Phase 5
+- No retry logic or dead-letter queue for embedding failures — failures are logged and the
+  conversation persists unsearchable; a persistent failure log and retry mechanism is deferred
+  to a later phase
 - No Redis — `langchain4j-redis` is a community module outside the BOM; pgvector is used instead
 - No agent decision-making (Phase 3)
 - No Docker Compose (Phase 4)
