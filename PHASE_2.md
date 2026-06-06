@@ -108,9 +108,9 @@ Search uses a **two-step retrieval flow**:
 - `app.search.max-results` (default: 20) — raw chunk matches fetched from pgvector before
   deduplication. Set higher than the number of conversations you want returned because multiple
   chunks from the same conversation will all appear as separate matches.
-- `app.search.min-score` (default: 0.5) — cosine similarity threshold (0–1). 0.5 filters obvious
-  noise while avoiding silent zero-result responses. Tune upward once real conversations are
-  indexed — above 0.75 is a strong semantic match, 0.5–0.75 is loosely related.
+- `app.search.min-score` (default: 0.65) — cosine similarity threshold (0–1). 0.65 balances
+  noise filtering and recall. Tune upward toward 0.75+ to tighten results once real conversations
+  are indexed — above 0.75 is a strong semantic match, 0.5–0.75 is loosely related.
 
 ---
 

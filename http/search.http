@@ -1,0 +1,14 @@
+### Semantic search - direct match; should return toothbrush conversation ranked highest
+GET http://localhost:8080/api/v1/conversations/search?query=electric+toothbrush+plaque+removal
+
+### Semantic search - meaning match, not keyword match
+### "cleaning electronic device" has no overlapping words with the laptop keyboard conversation
+### but the vectors should be close enough to surface it
+GET http://localhost:8080/api/v1/conversations/search?query=how+to+clean+electronic+device
+
+### Semantic search - low relevance query; may still return results at min-score=0.65 because
+### the model always produces a vector — raise min-score to 0.75+ to filter these out
+GET http://localhost:8080/api/v1/conversations/search?query=quantumcryptography
+
+### Semantic search - missing query param should return 400
+GET http://localhost:8080/api/v1/conversations/search

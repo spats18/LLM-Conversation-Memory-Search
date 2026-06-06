@@ -1,0 +1,14 @@
+### List conversations - paginated
+GET http://localhost:8080/api/v1/conversations?page=0&size=5
+
+### List conversations - sorted by createdAt desc (newest first)
+GET http://localhost:8080/api/v1/conversations?page=0&size=5&sort=createdAt,desc
+
+### List conversations - sorted by createdAt asc (oldest first)
+GET http://localhost:8080/api/v1/conversations?sort=createdAt,asc&size=5
+
+### DELETE - non-existent id should return 404 with error body
+DELETE http://localhost:8080/api/v1/conversations/00000000-0000-0000-0000-000000000000
+
+### DELETE - paste a real id from a prior GET to delete it
+DELETE http://localhost:8080/api/v1/conversations/{conversationId}
