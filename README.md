@@ -86,38 +86,27 @@ The project is built **incrementally**. Each phase produces something that works
 
 ---
 
-### Phase 3 — Agentic Layer
-> **Goal:** Add a real agent that decides when to use tools.
+### Phase 3 — Docker + Kubernetes
+> **Goal:** Make it production-deployable and demonstrate DevOps maturity.
 
-- Agent can decide: search your history before answering a new question
-- Tools available to agent: `search_conversations`, `summarize_conversation`, `store_conversation`
-- Agent workflow: user asks a question → agent checks memory → answers using past context
-- This is where the project becomes genuinely "agentic"
+- Dockerfile for the Spring Boot app
+- Docker Compose for local dev (app + Postgres/pgvector)
+- Kubernetes manifests for deployment
+- Separate scaling: ingestion workers vs search API
+- Health checks, config maps, secrets management
 
 👉 See [PHASE_3.md](./PHASE_3.md)
 
 ---
 
-### Phase 4 — Docker + Kubernetes
-> **Goal:** Make it production-deployable and demonstrate DevOps maturity.
-
-- Dockerfile for the Spring Boot app
-- Docker Compose for local dev (app + Redis)
-- Kubernetes manifests for deployment
-- Separate scaling: ingestion workers vs search API
-- Health checks, config maps, secrets management
-
-👉 See [PHASE_4.md](./PHASE_4.md)
-
----
-
-### Phase 5 — Additional Input Sources
-> **Goal:** Add structured ingestion on top of the existing pipeline. Post-MVP.
+### Phase 4 — Experimental: Input Sources + Redis Stack
+> **Goal:** Add structured ingestion and explore a purpose-built vector store. Post-MVP.
 
 - Exported Claude JSON file upload
 - Claude share URL fetch (Jsoup HTML scraping)
+- Redis Stack as an alternative vector store (experimental swap from pgvector)
 
-👉 See [PHASE_5.md](./PHASE_5.md)
+👉 See [PHASE_4.md](./PHASE_4.md)
 
 ---
 
@@ -128,9 +117,8 @@ Each phase produces a working, demonstrable system. No phase breaks what the pre
 Rough timeline:
 - Phase 1: ~1 week
 - Phase 2: ~2 weeks
-- Phase 3: ~1 week
-- Phase 4: ~a few days
-- Phase 5: ~1 week (post-MVP, time permitting)
+- Phase 3: ~a few days
+- Phase 4: ~1 week (post-MVP, time permitting)
 
 ---
 
@@ -144,10 +132,10 @@ Database (MVP):  PostgreSQL
 Vector Search (Phase 2+): pgvector (Postgres extension)
 Models:          OpenAI gpt-4o-mini (summarization)
                  OpenAI text-embedding-3-small (embeddings)
-                 → Swappable to Ollama in Phase 2
+                 → Swappable to Ollama via LangChain4j model abstraction
 Build Tool:      Gradle (Kotlin DSL)
 Containerization: Docker, Docker Compose
-Orchestration:   Kubernetes (Phase 4)
+Orchestration:   Kubernetes (Phase 3)
 ```
 
 ---
@@ -161,7 +149,6 @@ llm-memory-search/
 ├── PHASE_2.md
 ├── PHASE_3.md
 ├── PHASE_4.md
-├── PHASE_5.md
 ├── src/
 │   └── main/java/
 │       └── com/llmmemory/
@@ -172,9 +159,8 @@ llm-memory-search/
 │           │   └── service/
 │           ├── search/          ← SearchService (semantic KNN search)
 │           ├── shared/          ← GlobalExceptionHandler, domain exceptions
-│           ├── agent/           ← Agent + tools (Phase 3)
-│           └── ingestion/       ← File/URL parse (Phase 5)
-├── docker-compose.yml           ← Phase 4
-├── Dockerfile                   ← Phase 4
-└── k8s/                         ← Phase 4
+│           └── ingestion/       ← File/URL parse (Phase 4)
+├── docker-compose.yml           ← Phase 3
+├── Dockerfile                   ← Phase 3
+└── k8s/                         ← Phase 3
 ```

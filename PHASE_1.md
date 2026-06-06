@@ -165,11 +165,3 @@ Fixed-size split: every N characters where N is `app.chunking.size` (default 500
 
 ---
 
-## What Phase 1 Does NOT Do
-
-- No URL fetching (Phase 2)
-- No file upload (Phase 2)
-- No embeddings (Phase 2)
-- No semantic search (Phase 2)
-- No agents (Phase 3)
-- No Docker (Phase 4)

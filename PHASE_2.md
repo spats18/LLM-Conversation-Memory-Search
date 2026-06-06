@@ -42,11 +42,11 @@ Chunk overlap is 50 tokens so nothing is lost at split boundaries — each chunk
 
 ## Model Configuration
 
-Both `ChatLanguageModel` and `EmbeddingModel` are Spring beans. The underlying provider is a configuration detail — swapping OpenAI for Ollama requires only a property change and a module swap.
+Both `ChatModel` and `EmbeddingModel` are Spring beans in `LangChain4jConfig`. The underlying provider is a configuration detail — swapping OpenAI for Ollama requires only a module swap and a property change, no business logic changes.
 
 ```java
 // OpenAI (default)
-ChatLanguageModel chatModel = OpenAiChatModel.builder()
+ChatModel chatModel = OpenAiChatModel.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
     .modelName("gpt-4o-mini")
     .build();
@@ -57,7 +57,7 @@ EmbeddingModel embeddingModel = OpenAiEmbeddingModel.builder()
     .build();
 
 // Ollama alternative (requires: implementation("dev.langchain4j:langchain4j-ollama"))
-ChatLanguageModel chatModel = OllamaChatModel.builder()
+ChatModel chatModel = OllamaChatModel.builder()
     .baseUrl("http://localhost:11434")
     .modelName("llama3.1:8b")
     .build();
@@ -165,25 +165,3 @@ implementation("dev.langchain4j:langchain4j-open-ai")
 implementation("dev.langchain4j:langchain4j-pgvector")
 ```
 
----
-
-## Phase 2 Done When...
-
-- [x] POST raw text → conversation chunked, summarized, embedded, stored in pgvector
-- [x] Semantic search returns results that keyword search would miss
-- [x] Search returns summaries only; full conversation fetched separately by ID
-- [x] Keyword search preserved at /search/keyword; semantic search at /search
-- [ ] Swapping OpenAI for Ollama requires only a config change
-
----
-
-## What Phase 2 Does NOT Do
-
-- No new input sources — file upload and URL ingestion are Phase 5
-- No retry logic or dead-letter queue for embedding failures — failures are logged and the
-  conversation persists unsearchable; a persistent failure log and retry mechanism is deferred
-  to a later phase
-- No Redis — `langchain4j-redis` is a community module outside the BOM; pgvector is used instead
-- No agent decision-making (Phase 3)
-- No Docker Compose (Phase 4)
-- No Kubernetes (Phase 4)
