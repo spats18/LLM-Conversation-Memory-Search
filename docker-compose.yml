@@ -1,0 +1,76 @@
+services:
+
+  # ── Postgres + pgvector ──────────────────────────────────────────────────────
+  # pgvector/pgvector:pg16 is the official pgvector image — identical to postgres:16
+  # but with the vector extension pre-installed. Using plain postgres:16 would require
+  # compiling the extension from source inside the container.
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      # These three env vars are read by the official Postgres image on first startup
+      # to create the database, superuser, and password.
+      POSTGRES_DB: llmmemory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      # Exposes Postgres to your host machine so TablePlus can connect at localhost:5432.
+      # The app container connects via the internal Docker network (service name "postgres"),
+      # not through this port — this mapping is only for tools running outside Docker.
+      - "5432:5432"
+    volumes:
+      # Named volume: Postgres data survives container restarts and rebuilds.
+      # Without this, the database is wiped every time the container is recreated.
+      - postgres_data:/var/lib/postgresql/data
+      # Init script: runs once when the data directory is first created (empty volume).
+      # Creates the pgvector extension so the app can use vector columns.
+      # Does NOT run on subsequent startups — Postgres skips it once the DB exists.
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      # pg_isready exits 0 when Postgres is accepting connections, non-zero otherwise.
+      # Without this, the app container starts immediately and crashes because Postgres
+      # hasn't finished initializing yet.
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Spring Boot app ──────────────────────────────────────────────────────────
+  app:
+    # build: . tells Docker Compose to build the image from the Dockerfile in this directory.
+    # image: names the resulting image so it matches what you built manually with docker build.
+    # If the image already exists locally, Docker Compose uses it without rebuilding.
+    build: .
+    image: llm-memory:latest
+    ports:
+      # host:container — maps port 8080 on your machine to port 8080 inside the container.
+      # The app is still reachable at localhost:8080 from your browser, same as before.
+      - "8080:8080"
+    environment:
+      # Spring Boot's relaxed binding maps env vars to properties:
+      # SPRING_DATASOURCE_URL   → spring.datasource.url
+      # SPRING_DATASOURCE_PASSWORD → spring.datasource.password
+      # APP_DB_HOST             → app.db.host
+      # APP_DB_PASSWORD         → app.db.password
+      #
+      # "postgres" here is the service name defined above — Docker Compose puts both
+      # containers on the same private network and resolves service names as hostnames.
+      # Inside this container, "postgres" resolves to the Postgres container's IP.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/llmmemory
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_DB_HOST: postgres
+      APP_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # OPENAI_API_KEY is already read as ${OPENAI_API_KEY} in application.properties —
+      # passing it here forwards it from your shell into the container's environment.
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      postgres:
+        # condition: service_healthy means Docker Compose waits until the healthcheck
+        # above passes before starting the app. Just "depends_on: postgres" (without
+        # the condition) only waits for the container to start, not for Postgres to
+        # be ready to accept connections — the app would still crash.
+        condition: service_healthy
+
+# Named volumes are managed by Docker (stored under /var/lib/docker/volumes/).
+# Declaring them here registers them — services reference them by name above.
+volumes:
+  postgres_data:

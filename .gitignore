@@ -20,3 +20,4 @@ src/main/resources/application-local.properties
 CLAUDE.md
 DEV_COMMANDS.md
 DESIGN_DECISIONS (for interview prep).md
+DOCKER_K8S (for interview prep).md
