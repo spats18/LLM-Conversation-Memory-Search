@@ -1,221 +1,77 @@
-# Phase 3 — Docker + Kubernetes
+# Phase 3 — Docker + Docker Compose
 
-> **Status: 🔲 Not started.**
+> **Status: ✅ Complete.**
 
 ## Goal
 
-Package and deploy the full stack — Spring Boot app + PostgreSQL (with pgvector) — using Docker Compose for local development and Kubernetes (Minikube) for orchestration.
+Package and deploy the full stack — Spring Boot app + PostgreSQL (with pgvector) — using Docker for containerisation and Docker Compose for local orchestration.
 
 ---
 
-## Docker
+## What Was Built
 
 ### Dockerfile
 
-Multi-stage build: the build stage uses the JDK to compile; the run stage uses only the JRE, keeping the final image small and free of compiler tooling. The container runs as a non-root user to limit blast radius if compromised.
+Multi-stage build: Stage 1 compiles with the JDK and produces a fat jar. Stage 2 starts fresh from a JRE-only base image and copies only the jar. The final image contains no compiler, no Gradle cache, no source code — roughly 150MB vs 500MB+ for a single-stage build.
 
-```dockerfile
-# Stage 1: Build
-FROM eclipse-temurin:21-jdk-alpine AS build
-WORKDIR /app
-COPY build.gradle.kts settings.gradle.kts gradlew ./
-COPY gradle ./gradle
-COPY src ./src
-RUN ./gradlew bootJar -x test
+The container runs as a non-root user (`appuser`) to limit blast radius if the container is ever compromised.
 
-# Stage 2: Run
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
+Layer ordering is deliberate: build files (`build.gradle.kts`, `gradlew`) are copied before source code so that Gradle dependency downloads are cached and not re-run on every source change.
 
 ### Docker Compose
 
-```yaml
-version: '3.8'
+Two services declared in `docker-compose.yml`:
 
-services:
-  app:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/llmmemory
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
+- **postgres** — `pgvector/pgvector:pg16`, the official Postgres image with the pgvector extension pre-installed. Exposes port 5432 to the host so TablePlus can connect. A named volume (`postgres_data`) persists data across container restarts.
+- **app** — built from the Dockerfile. Port 8080 mapped to host. Env vars override the datasource URL and DB host so the app reaches `postgres` (the service name on the Docker internal network) instead of `localhost`.
 
-  postgres:
-    image: pgvector/pgvector:pg17
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=llmmemory
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+Key wiring decisions:
+- `depends_on: condition: service_healthy` — app waits until the postgres healthcheck (`pg_isready`) passes before starting. Without this the app crashes on startup because Postgres hasn't finished initialising.
+- `SPRING_DATASOURCE_URL` and `APP_DB_HOST` both overridden via env vars — Spring Boot's relaxed binding maps OS env vars to property names at runtime, no code change needed.
+- `OPENAI_API_KEY` and `POSTGRES_PASSWORD` come from the shell at runtime — never hardcoded in the file.
 
-volumes:
-  postgres_data:
-```
+### init.sql
 
-`pgvector/pgvector:pg17` is the official Postgres image with the pgvector extension pre-installed — no manual `CREATE EXTENSION` step needed in the container. `depends_on` with `condition: service_healthy` prevents the app from starting before Postgres is ready. `OPENAI_API_KEY` and `POSTGRES_PASSWORD` come from the shell — no secrets in the Compose file.
+Runs once when the Postgres data volume is first created. Enables the `vector` extension so the app can create `vector(1536)` columns. The `chunk_embeddings` table is created by LangChain4j's `PgVectorEmbeddingStore` on app startup. The `conversations` and `conversation_chunks` tables are created by Hibernate (`ddl-auto=update`).
+
+The `tsvector` generated column and GIN index on `conversations.search_vector` are applied once manually after first startup — Hibernate cannot create generated columns. This is the known limitation; Flyway will manage the full schema in a later phase.
 
 ---
 
-## Kubernetes
+## Why Kubernetes Was Skipped
 
-### Why Separate Deployments
+Kubernetes solves availability and independent scaling across a cluster of machines. For this project — one user, one machine, no availability requirement — it adds no product value. Docker Compose is the correct tool at this scale.
 
-Ingestion (chunking, OpenAI calls, embedding) is CPU/memory intensive and bursty. Search (embed query + pgvector KNN) is lightweight and high-frequency. Separating them into distinct Deployments lets each scale independently:
+The honest engineering call: Kubernetes complexity is only justified when you have at least one of:
+- Multiple users with concurrent traffic
+- An availability requirement (no downtime on deploy or crash)
+- Services with genuinely different scaling profiles that need to scale independently
+
+This project has none of those. Adding Kubernetes manifests would have been resume-driven development — complexity added for appearance, not function.
+
+**The interview answer:** *"Ingestion and search have different resource profiles — ingestion is CPU-heavy and bursty, search is lightweight and frequent. If this were a multi-user service I'd deploy them as separate Kubernetes Deployments and scale them independently. At single-user scale, that adds complexity with no payoff. Docker Compose is sufficient and Kubernetes would be over-engineering."*
+
+Knowing when not to use a tool is as important as knowing how to use it.
+
+---
+
+## How to Run
 
 ```bash
-kubectl scale deployment llm-memory-ingestion --replicas=5
-kubectl scale deployment llm-memory-search --replicas=2
+# Export secrets (required every new terminal session)
+export POSTGRES_PASSWORD=yourpassword
+export OPENAI_API_KEY=sk-...
+
+# Start both services
+docker compose up
+
+# First startup only — add tsvector column and GIN index
+docker compose exec postgres psql -U postgres -d llmmemory -c \
+  "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS search_vector tsvector \
+   GENERATED ALWAYS AS (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(raw_content,''))) STORED;"
+
+docker compose exec postgres psql -U postgres -d llmmemory -c \
+  "CREATE INDEX IF NOT EXISTS conversations_search_vector_idx ON conversations USING GIN (search_vector);"
 ```
 
-### Manifests
-
-#### ConfigMap
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: llm-memory-config
-data:
-  SPRING_PROFILES_ACTIVE: "kubernetes"
-  APP_DB_HOST: "postgres-service"
-  APP_DB_PORT: "5432"
-  APP_DB_NAME: "llmmemory"
-  APP_DB_USER: "postgres"
-```
-
-#### Secret
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: llm-memory-secrets
-type: Opaque
-data:
-  OPENAI_API_KEY: <base64-encoded-key>
-```
-
-Generate: `echo -n "your-key" | base64`. In production, use a secrets manager (AWS Secrets Manager, Vault) instead of YAML-embedded secrets.
-
-#### App Deployment + Service
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: llm-memory-app
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: llm-memory
-  template:
-    metadata:
-      labels:
-        app: llm-memory
-    spec:
-      containers:
-        - name: llm-memory
-          image: your-dockerhub/llm-memory:latest
-          ports:
-            - containerPort: 8080
-          envFrom:
-            - configMapRef:
-                name: llm-memory-config
-            - secretRef:
-                name: llm-memory-secrets
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 5
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "250m"
-            limits:
-              memory: "1Gi"
-              cpu: "500m"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: llm-memory-service
-spec:
-  selector:
-    app: llm-memory
-  ports:
-    - port: 80
-      targetPort: 8080
-  type: LoadBalancer
-```
-
-### Actuator Probes
-
-Liveness and readiness probes require Spring Boot Actuator with Kubernetes probe support.
-
-```kotlin
-implementation("org.springframework.boot:spring-boot-starter-actuator")
-```
-
-```properties
-management.endpoint.health.probes.enabled=true
-management.health.livenessState.enabled=true
-management.health.readinessState.enabled=true
-management.endpoints.web.exposure.include=health,info,metrics
-```
-
-Liveness (`/actuator/health/liveness`): if unhealthy, Kubernetes restarts the pod.
-Readiness (`/actuator/health/readiness`): if not ready, Kubernetes removes the pod from the Service endpoint list without restarting it.
-
-### Local Cluster (Minikube)
-
-```bash
-minikube start
-eval $(minikube docker-env)          # point Docker CLI at minikube's daemon
-docker build -t llm-memory:latest .
-kubectl apply -f k8s/
-minikube service llm-memory-service
-```
-
----
-
-## Directory Structure
-
-```
-llm-memory-search/
-├── Dockerfile
-├── docker-compose.yml
-└── k8s/
-    ├── configmap.yaml
-    ├── secret.yaml
-    └── app-deployment.yaml
-```
-
+App is available at `localhost:8080`. Postgres is available at `localhost:5432` for TablePlus.

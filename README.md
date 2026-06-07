@@ -86,14 +86,12 @@ The project is built **incrementally**. Each phase produces something that works
 
 ---
 
-### Phase 3 — Docker + Kubernetes
-> **Goal:** Make it production-deployable and demonstrate DevOps maturity.
+### Phase 3 — Docker + Docker Compose ✅ Complete
+> **Goal:** Package the full stack into containers and wire them together for reproducible local deployment.
 
-- Dockerfile for the Spring Boot app
-- Docker Compose for local dev (app + Postgres/pgvector)
-- Kubernetes manifests for deployment
-- Separate scaling: ingestion workers vs search API
-- Health checks, config maps, secrets management
+- Multi-stage Dockerfile (JDK build → JRE run, ~150MB final image)
+- Docker Compose wires app + Postgres/pgvector with healthcheck and env var overrides
+- Kubernetes skipped — overkill for a single-user tool; Docker Compose is sufficient
 
 👉 See [PHASE_3.md](./PHASE_3.md)
 
