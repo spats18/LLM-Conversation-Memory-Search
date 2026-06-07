@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.util.Pair;
 
 import com.llmmemory.conversation.domain.entity.Conversation;
 import com.llmmemory.conversation.domain.entity.ConversationChunk;
@@ -53,7 +56,6 @@ public class ConversationService {
     this.searchService = searchService;
   }
 
-  @Transactional
   public Conversation createConversation(String title, String source, String rawContent) {
     // App-level check for a clean 409 before we attempt the INSERT.
     // The DB UNIQUE constraint on title is the source of truth — concurrent
@@ -62,6 +64,8 @@ public class ConversationService {
       throw new DuplicateTitleException(title);
     }
 
+    // get Summarization first, so the client gets faster feedback if the LLM call
+    // fails — before we do any DB writes or chunking.
     String summarized;
     try {
       summarized = summarizationService.summarize(rawContent);
@@ -69,6 +73,27 @@ public class ConversationService {
       log.error("Error summarizing conversation: {}", e.getMessage(), e);
       summarized = "[SUMMARIZATION_FAILED]";
     }
+
+    // We have separated the Db and APi calls to LLMs to ensure that we don't keep
+    // Db connections open while waiting for LLM responses, which can be slow.
+    // If we have concurrent load and we keep Db connections open during LLM calls,
+    // we can run out of Db connections, which causes cascading failures.
+    Pair<Conversation, List<ConversationChunk>> conversationAndChunks = createAndSaveConversationInDb(title, source,
+        rawContent, summarized);
+
+    Conversation conversation = conversationAndChunks.getFirst();
+    List<ConversationChunk> persistedChunks = conversationAndChunks.getSecond();
+    try {
+      embeddingService.embedChunks(persistedChunks);
+    } catch (Exception e) {
+      log.error("Embedding failed for conversation {}: {}", conversation.getId(), e.getMessage(), e);
+    }
+    return conversation;
+  }
+
+  @Transactional
+  public Pair<Conversation, List<ConversationChunk>> createAndSaveConversationInDb(String title, String source,
+      String rawContent, String summarized) {
 
     // Save Conversation
     Conversation conversation = new Conversation();
@@ -86,16 +111,20 @@ public class ConversationService {
       chunk.setConversationId(conversation.getId());
       chunk.setChunkIndex(chunkIndex);
       chunk.setContent(chunks.get(chunkIndex));
-      conversationChunkRepository.save(chunk);
       persistedChunks.add(chunk);
     }
+    // batching the saving of chunks to avoid N+1 insert problem and to get better
+    // performance.
+    conversationChunkRepository.saveAll(persistedChunks);
+    return Pair.of(conversation, persistedChunks);
+  }
 
-    try {
-      embeddingService.embedChunks(persistedChunks);
-    } catch (Exception e) {
-      log.error("Embedding failed for conversation {}: {}", conversation.getId(), e.getMessage(), e);
-    }
-    return conversation;
+  public Page<Conversation> listConversations(Pageable pageable) {
+    return conversationRepository.findAll(pageable);
+  }
+
+  public Page<Conversation> searchConversationsByKeyword(String query, Pageable pageable) {
+    return conversationRepository.searchByKeyword(query, pageable);
   }
 
   public List<Conversation> searchConversations(String query) {
@@ -103,8 +132,10 @@ public class ConversationService {
   }
 
   // Deletes a conversation, its chunks, and its embeddings.
-  // Embedding store uses its own connection outside Spring's transaction, so embeddings
-  // are removed first — a rollback on the DB side leaves no orphans; an embedding-store
+  // Embedding store uses its own connection outside Spring's transaction, so
+  // embeddings
+  // are removed first — a rollback on the DB side leaves no orphans; an
+  // embedding-store
   // failure surfaces before the DB rows are touched.
   @Transactional
   public void deleteConversation(UUID id) {

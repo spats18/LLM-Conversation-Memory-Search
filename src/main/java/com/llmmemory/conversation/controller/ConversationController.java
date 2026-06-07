@@ -21,7 +21,6 @@ import com.llmmemory.conversation.domain.ConversationRequest;
 import com.llmmemory.conversation.domain.ConversationResponse;
 import com.llmmemory.conversation.domain.PagedResponse;
 import com.llmmemory.conversation.domain.entity.Conversation;
-import com.llmmemory.conversation.repository.ConversationRepository;
 import com.llmmemory.conversation.service.ConversationService;
 
 import jakarta.validation.Valid;
@@ -30,13 +29,10 @@ import jakarta.validation.Valid;
 @RestController
 public class ConversationController {
         private final ConversationService conversationService;
-        private final ConversationRepository conversationRepository;
 
         public ConversationController(
-                        ConversationService conversationService,
-                        ConversationRepository conversationRepository) {
+                        ConversationService conversationService) {
                 this.conversationService = conversationService;
-                this.conversationRepository = conversationRepository;
         }
 
         @PostMapping("/conversations")
@@ -56,7 +52,7 @@ public class ConversationController {
 
         @GetMapping("/conversations")
         public PagedResponse<ConversationResponse> listConversations(Pageable pageable) {
-                Page<ConversationResponse> page = conversationRepository.findAll(pageable)
+                Page<ConversationResponse> page = conversationService.listConversations(pageable)
                                 .map(ConversationResponse::from);
 
                 return new PagedResponse<>(
@@ -76,7 +72,7 @@ public class ConversationController {
         @GetMapping("/conversations/search/keyword")
         public PagedResponse<ConversationResponse> searchConversationsByKeyword(
                         @RequestParam String query, Pageable pageable) {
-                Page<ConversationResponse> page = conversationRepository.searchByKeyword(query, pageable)
+                Page<ConversationResponse> page = conversationService.searchConversationsByKeyword(query, pageable)
                                 .map(ConversationResponse::from);
 
                 return new PagedResponse<>(

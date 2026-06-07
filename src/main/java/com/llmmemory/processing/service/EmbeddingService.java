@@ -38,8 +38,10 @@ public class EmbeddingService {
             String rawContent = chunk.getContent();
 
             Metadata metadata = new Metadata();
-            metadata.put("conversationId", chunk.getConversationId());
-            metadata.put("chunkId", chunk.getId());
+            // Saving UUID as string for easier querying in pgvector metadata JSONB column
+            // for Delete operations.
+            metadata.put("conversationId", chunk.getConversationId().toString());
+            metadata.put("chunkId", chunk.getId().toString());
             metadata.put("chunkIndex", chunk.getChunkIndex());
             TextSegment segment = TextSegment.from(rawContent, metadata);
             textSegments.add(segment);
@@ -58,7 +60,7 @@ public class EmbeddingService {
     }
 
     public void deleteEmbeddingsByConversationId(UUID conversationId) {
-        embeddingStore.removeAll(new IsEqualTo("conversationId", conversationId));
+        embeddingStore.removeAll(new IsEqualTo("conversationId", conversationId.toString()));
         log.info("Deleted embeddings for conversation {}", conversationId);
     }
 }
