@@ -1,8 +1,10 @@
 # LLM Conversation Memory & Search
 
-A personal tool for indexing, summarizing, and semantically searching LLM conversations. Paste raw conversation text — the app summarizes it, chunks it, stores embeddings in pgvector, and lets you search across all indexed conversations using natural language, not keywords.
+A production-grade personal tool for indexing, summarizing, and semantically searching LLM conversations. The ingestion API is hardened with guard rails — content moderation, rate limiting, prompt injection detection, and token budget enforcement — so the pipeline is safe to expose and cost-controlled by design.
 
-This is a RAG (Retrieval-Augmented Generation) pipeline built incrementally across four phases.
+Paste raw conversation text and the app summarizes it, chunks it, stores embeddings in pgvector, and lets you search across all indexed conversations using natural language, not keywords.
+
+This is a RAG (Retrieval-Augmented Generation) pipeline built incrementally across five phases.
 
 ---
 
@@ -11,17 +13,26 @@ This is a RAG (Retrieval-Augmented Generation) pipeline built incrementally acro
 ```
 ┌─────────────────────────────────────────────────────┐
 │                  INPUT SOURCES                       │
-│   [Claude Share URL]     [Exported JSON File]        │
-└──────────────┬──────────────────────┬───────────────┘
-               │                      │
-               ▼                      ▼
+│   [Raw Paste]  [Claude Share URL]  [JSON File]       │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│                   GUARD RAILS                        │
+│                                                      │
+│  • Rate limiting          • Token budget check       │
+│  • Content moderation     • Minimum content length   │
+│  • Prompt injection scan  • Near-duplicate detection │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
 ┌─────────────────────────────────────────────────────┐
 │              INGESTION PIPELINE (LangChain4j)        │
 │                                                      │
-│  1. Fetch / Parse conversation                       │
-│  2. Summarize conversation  ──► LLM (OpenAI/Ollama) │
+│  1. Summarize conversation  ──► LLM (gpt-4o-mini)   │
+│  2. Validate summary output                          │
 │  3. Chunk into segments                              │
-│  4. Generate embeddings   ──► Embedding Model        │
+│  4. Generate embeddings   ──► text-embedding-3-small │
 │  5. Store in pgvector (chunk_embeddings table)       │
 └──────────────────────────┬──────────────────────────┘
                            │
@@ -29,8 +40,8 @@ This is a RAG (Retrieval-Augmented Generation) pipeline built incrementally acro
 ┌─────────────────────────────────────────────────────┐
 │              SEARCH API (Spring Boot)                │
 │                                                      │
-│  User query ──► Embed query ──► Similarity Search    │
-│              ──► Return ranked conversation chunks   │
+│  User query ──► Embed query ──► KNN similarity search│
+│              ──► Return ranked conversations         │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -56,7 +67,8 @@ This is a RAG (Retrieval-Augmented Generation) pipeline built incrementally acro
 | 1 — **[MVP](./PHASE_1.md)** | Spring Boot API, PostgreSQL, keyword search, direct OpenAI summarization | Complete |
 | 2 — **[Semantic Search](./PHASE_2.md)** | LangChain4j pipeline, pgvector embeddings, semantic search | Complete |
 | 3 — **[Docker](./PHASE_3.md)** | Multi-stage Dockerfile, Docker Compose | Complete |
-| 4 — **[Input Sources](./PHASE_4.md)** | JSON file upload, Claude share URL | Not started |
+| 4 — **[Guard Rails](./PHASE_4.md)** | Input validation, token budget guards, retry/dead-letter for embedding failures, observability | Not started |
+| 5 — **[Input Sources](./PHASE_5.md)** | JSON file upload, Claude share URL | Not started |
 
 ---
 
@@ -69,7 +81,7 @@ llm-memory-search/
 │   ├── processing/      ← ChunkingService, SummarizationService, EmbeddingService, LangChain4jConfig
 │   ├── search/          ← SearchService (semantic KNN search)
 │   ├── shared/          ← GlobalExceptionHandler, domain exceptions
-│   └── ingestion/       ← File/URL parse (Phase 4)
+│   └── ingestion/       ← File/URL parse (Phase 5)
 ├── Dockerfile
 ├── docker-compose.yml
 └── init.sql
