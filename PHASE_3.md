@@ -1,7 +1,5 @@
 # Phase 3 — Docker + Docker Compose
 
-> **Status: ✅ Complete.**
-
 ## Goal
 
 Package and deploy the full stack — Spring Boot app + PostgreSQL (with pgvector) — using Docker for containerisation and Docker Compose for local orchestration.

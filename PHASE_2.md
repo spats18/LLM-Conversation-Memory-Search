@@ -1,7 +1,5 @@
 # Phase 2 — LangChain4j Pipeline + Semantic Search
 
-> **Status: ✅ Complete.**
-
 ## Goal
 
 Wire a LangChain4j pipeline into the existing POST endpoint and replace keyword search with pgvector KNN semantic search.

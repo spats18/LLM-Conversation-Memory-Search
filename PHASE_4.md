@@ -1,6 +1,6 @@
 # Phase 4 — Input Sources
 
-> **Status: 🔲 Not started.**
+> Work in progress — not started yet. The pipeline and API from Phases 1–3 are complete; this phase extends the input layer.
 
 ## Goal
 

@@ -51,38 +51,24 @@ This is a RAG (Retrieval-Augmented Generation) pipeline built incrementally acro
 
 ## Phases
 
-### Phase 1 — MVP: Paste, Store, Keyword Search ✅ Complete
+### Phase 1 — MVP: Paste, Store, Keyword Search
 - Spring Boot REST API (POST / GET list / GET search / DELETE)
 - PostgreSQL with `tsvector` generated column + GIN index for keyword search
 - Direct OpenAI HTTP call for summarization
 
-👉 See [PHASE_1.md](./PHASE_1.md)
-
----
-
-### Phase 2 — LangChain4j Pipeline + Semantic Search ✅ Complete
+### Phase 2 — LangChain4j Pipeline + Semantic Search
 - LangChain4j orchestrates: summarize → chunk → embed
 - pgvector stores chunk embeddings for KNN similarity search
 - `GET /api/v1/conversations/search` — semantic search ranked by similarity
 - `GET /api/v1/conversations/search/keyword` — keyword search preserved
 
-👉 See [PHASE_2.md](./PHASE_2.md)
-
----
-
-### Phase 3 — Docker + Docker Compose ✅ Complete
+### Phase 3 — Docker + Docker Compose
 - Multi-stage Dockerfile (JDK build → JRE run, ~150MB final image)
 - Docker Compose wires app + Postgres/pgvector with healthcheck and env var overrides
 
-👉 See [PHASE_3.md](./PHASE_3.md)
-
----
-
-### Phase 4 — Input Sources (Planned)
+### Phase 4 — Input Sources (Not started)
 - Exported Claude JSON file upload
 - Claude share URL fetch via Jsoup
-
-👉 See [PHASE_4.md](./PHASE_4.md)
 
 ---
 

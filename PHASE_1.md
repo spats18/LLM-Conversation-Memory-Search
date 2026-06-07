@@ -1,7 +1,5 @@
 # Phase 1 — MVP: Paste, Store, Keyword Search
 
-> **Status: ✅ Complete.**
-
 ## Goal
 
 Establish the end-to-end skeleton — Spring Boot + PostgreSQL + a direct OpenAI summarization call — before LangChain4j, embeddings, or semantic search enter the stack.
