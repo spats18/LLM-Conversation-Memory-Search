@@ -50,9 +50,9 @@ public class LangChain4jConfig {
                 .build();
     }
 
-    // Used by EmbeddingService to convert chunk text into vectors stored in pgvector (Phase 2)
-    // Phase 5 swaps the store to Redis Stack — the model itself does not change
-    // Kept separate from chatLanguageModel — different OpenAI endpoint, different response shape
+    // Used by EmbeddingService to convert chunk text into vectors stored in pgvector.
+    // Kept separate from chatLanguageModel — different OpenAI endpoint, different response shape.
+    // If the store is ever swapped to Redis Stack, this model bean does not change.
     @Bean
     public EmbeddingModel embeddingModel() {
         return OpenAiEmbeddingModel.builder()

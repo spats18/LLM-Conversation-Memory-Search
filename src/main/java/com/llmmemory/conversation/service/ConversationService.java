@@ -128,15 +128,18 @@ public class ConversationService {
   }
 
   public List<Conversation> searchConversations(String query) {
-    return searchService.search(query);
+    log.info("Semantic search triggered for query: '{}'", query);
+    List<Conversation> results = searchService.search(query);
+    log.info("Semantic search returned {} result(s) for query: '{}'", results.size(), query);
+    return results;
   }
 
   // Deletes a conversation, its chunks, and its embeddings.
-  // Embedding store uses its own connection outside Spring's transaction, so
-  // embeddings
-  // are removed first — a rollback on the DB side leaves no orphans; an
-  // embedding-store
-  // failure surfaces before the DB rows are touched.
+  // Embeddings are removed first: if the embedding store call fails, the DB is untouched
+  // and the state is consistent. If the embedding store succeeds but the DB rolls back,
+  // the rows survive without embeddings (keyword-searchable but not semantic-searchable).
+  // The reverse order risks orphaned embeddings with no parent DB row, which cannot be
+  // recovered without a manual store scan.
   @Transactional
   public void deleteConversation(UUID id) {
     if (!conversationRepository.existsById(id)) {
