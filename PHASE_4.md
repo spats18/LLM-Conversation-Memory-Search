@@ -1,24 +1,18 @@
-# Phase 4 — Experimental: Input Sources + Redis Stack Vector Store
+# Phase 4 — Input Sources
 
-> **Status: 🔲 Post-MVP. Start after Phase 3 is complete.**
+> **Status: 🔲 Not started.**
 
 ## Goal
 
-Two independent workstreams, both optional extensions once the core project is done:
-
-1. **Additional input sources** — file upload and URL fetch on top of the existing pipeline
-2. **Redis Stack as the vector store** — replace pgvector with Redis Stack to learn how a purpose-built vector database works, and understand what pgvector gave up to stay simple
+Add structured ingestion sources on top of the existing pipeline — currently only raw text paste is supported.
 
 ---
 
-## Part A: Additional Input Sources
+## Source 1: Exported Claude JSON
 
-### Source 1: Exported Claude JSON
-
-`POST /api/v1/conversations/ingest-file` accepts a multipart upload of an exported Claude JSON file. Jackson deserializes it into a `ParsedConversation`, which feeds the existing pipeline.
+`POST /api/v1/conversations/ingest-file` accepts a multipart upload of an exported Claude JSON file.
 
 Expected structure:
-
 ```json
 {
   "title": "Conversation about Spring Boot",
@@ -33,85 +27,16 @@ Expected structure:
 **What's needed:**
 - `ParsedConversation` + `ConversationTurn` model classes in `ingestion/`
 - `FileParserService` — Jackson deserialization into `ParsedConversation`
-- `IngestionService` — flattens turns into text, hands off to the pipeline
-
-### Source 2: Claude Share URL
-
-`POST /api/v1/conversations/ingest-url` accepts a Claude share URL (e.g. `https://claude.ai/share/some-id`). `UrlFetcherService` fetches the page via Jsoup, parses the HTML to extract title and turns, and feeds the same pipeline.
-
-The HTML parser is intentionally fragile — Claude's share page structure is undocumented and can change at any time. This is documented in the code as a known tradeoff.
-
-**What's needed:**
-- `UrlFetcherService` in `ingestion/` — Jsoup HTTP GET + HTML parse
-- Dependency already present: `implementation("org.jsoup:jsoup:1.17.2")`
+- `IngestionService` — flattens turns into text, hands off to the existing pipeline
 
 ---
 
-## Part B: Redis Stack as Vector Store
+## Source 2: Claude Share URL
 
-### Why Do This
+`POST /api/v1/conversations/ingest-url` accepts a Claude share URL. `UrlFetcherService` fetches the page via Jsoup, parses the HTML to extract title and turns, and feeds the existing pipeline.
 
-pgvector was chosen for Phase 2 because Postgres was already running and the LangChain4j BOM managed the dependency cleanly. The learning tradeoff: pgvector abstracts away most of the vector store complexity. Redis Stack exposes it.
+**What's needed:**
+- `UrlFetcherService` in `ingestion/` — Jsoup HTTP GET + HTML parse
+- Jsoup dependency: `implementation("org.jsoup:jsoup:1.17.2")`
 
-Swapping to Redis Stack here teaches:
-- How RediSearch vector indexes work (FLAT vs HNSW, dimensions, distance metrics)
-- What a dual-write architecture looks like in practice — Postgres for relational data, Redis for vectors, both staying in sync
-- The cost of a purpose-built vector store vs a Postgres extension
-- Why companies choose Redis Stack over pgvector at scale (latency, throughput, operational separation)
-
-### What Redis Stack Stores
-
-Each chunk becomes a JSON document in Redis with a vector field:
-
-```json
-{
-  "chunk_id": "uuid",
-  "conversation_id": "uuid",
-  "conversation_title": "My Spring Boot conversation",
-  "chunk_content": "The raw chunk text",
-  "summary": "A summary of this chunk",
-  "embedding": [0.123, -0.456, ...]
-}
-```
-
-A RediSearch vector index is created once at startup:
-
-```
-FT.CREATE idx:chunks ON JSON
-  SCHEMA $.embedding AS embedding VECTOR FLAT 6
-    TYPE FLOAT32 DIM 1536 DISTANCE_METRIC COSINE
-```
-
-KNN search queries run against this index — LangChain4j's `langchain4j-redis` community module handles index creation and query execution.
-
-### Dual-Write Architecture
-
-With Redis Stack, both stores must stay in sync:
-
-| Operation | Postgres | Redis |
-|---|---|---|
-| Ingest | Store conversation + chunks | Store chunk embeddings |
-| Delete | Remove conversation + chunks | Remove chunk documents |
-| Search | Relational queries (list, filter) | Vector KNN (semantic search) |
-
-Deletion is the tricky part — if the Redis delete fails after Postgres succeeds, embeddings are orphaned and surface in search results for conversations that no longer exist. The service layer handles both deletes in order and throws if Redis fails.
-
-### Dependency
-
-`langchain4j-redis` is a community module versioned independently from the BOM:
-
-```kotlin
-implementation("dev.langchain4j:langchain4j-redis:1.0.0-beta2")
-```
-
-### Running Redis Stack Locally
-
-```bash
-docker run -d --name redis-stack \
-  -p 6379:6379 \
-  -p 8001:8001 \
-  redis/redis-stack:latest
-```
-
-Port 8001 is RedisInsight — inspect stored documents, vector indexes, and run queries visually.
-
+Note: Claude's share page HTML structure is undocumented and may change without notice.
