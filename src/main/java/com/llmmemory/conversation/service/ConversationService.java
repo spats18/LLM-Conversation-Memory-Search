@@ -102,14 +102,16 @@ public class ConversationService {
     return searchService.search(query);
   }
 
-  // Deletes a conversation along with all its chunks. Single transaction so
-  // either both deletes succeed or neither does. Chunks must go first because
-  // the FK on conversation_chunks.conversation_id has no ON DELETE CASCADE.
+  // Deletes a conversation, its chunks, and its embeddings.
+  // Embedding store uses its own connection outside Spring's transaction, so embeddings
+  // are removed first — a rollback on the DB side leaves no orphans; an embedding-store
+  // failure surfaces before the DB rows are touched.
   @Transactional
   public void deleteConversation(UUID id) {
     if (!conversationRepository.existsById(id)) {
       throw new ConversationNotFoundException(id);
     }
+    embeddingService.deleteEmbeddingsByConversationId(id);
     conversationChunkRepository.deleteByConversationId(id);
     conversationRepository.deleteById(id);
   }

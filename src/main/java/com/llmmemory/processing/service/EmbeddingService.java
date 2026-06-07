@@ -2,6 +2,7 @@ package com.llmmemory.processing.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.model.output.TokenUsage;
+import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
 import dev.langchain4j.store.embedding.pgvector.PgVectorEmbeddingStore;
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,5 +55,10 @@ public class EmbeddingService {
         List<Embedding> embeddings = response.content();
         embeddingStore.addAll(embeddings, textSegments);
         log.info("Stored {} embeddings in pgvector", embeddings.size());
+    }
+
+    public void deleteEmbeddingsByConversationId(UUID conversationId) {
+        embeddingStore.removeAll(new IsEqualTo("conversationId", conversationId));
+        log.info("Deleted embeddings for conversation {}", conversationId);
     }
 }
